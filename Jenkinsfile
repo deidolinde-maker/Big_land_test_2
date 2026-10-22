@@ -8,33 +8,11 @@ pipeline {
   }
 
   parameters {
-    choice(
-      name: 'PROVIDER_SCOPE',
-      choices: [
-        'release_chain',
-        'big_two_1of2',
-        'big_two_2of2',
-        'rtk_megafon',
-        'small_pool',
-        'mts',
-        'beeline',
-        'megafon',
-        't2',
-        'rostelecom',
-        'domru',
-        'ttk',
-      ],
-      description: 'URL-brand scope. release_chain: big_two 1/2 -> big_two 2/2 -> rtk_megafon -> small_pool(domru+ttk).'
-    )
-    string(name: 'SITE', defaultValue: '', description: 'Unused in URL-brand mode. Keep empty.')
-    choice(name: 'RUN_MODE', choices: ['legacy', 'form-oriented'], description: 'Run model. form-oriented uses all active brand URLs and one PRIMARY_FORM.')
-    choice(name: 'FORM_SUITE', choices: ['all', 'profit', 'connection', 'connection_cards', 'checkaddress', 'business', 'undecided', 'moving', 'express'], description: 'Form suite to run in URL-brand mode.')
-    choice(name: 'PRIMARY_FORM', choices: ['', 'profit', 'connection', 'checkaddress', 'undecided', 'moving', 'express'], description: 'Primary form for form-oriented mode. Leave empty in legacy mode.')
+    choice(name: 'PRIMARY_FORM', choices: ['', 'profit', 'connection', 'checkaddress', 'undecided', 'moving', 'express'], description: 'Основная форма текущей job.')
     choice(name: 'SERVICE_MODE', choices: ['core', 'variants', 'all'], description: 'Service mode to run.')
     booleanParam(name: 'ENABLE_CONTINUOUS_LOOP', defaultValue: false, description: 'After summary, schedule next build with same params.')
     string(name: 'LOOP_DELAY_SECONDS', defaultValue: '60', description: 'Delay before scheduling next loop build.')
     string(name: 'CHAIN_NEXT_JOB', defaultValue: '', description: 'Optional: next Jenkins job name for chained 24/7 run.')
-    string(name: 'CHAIN_NEXT_SCOPE', defaultValue: '', description: 'Optional: PROVIDER_SCOPE value for next chained job.')
     string(name: 'CHAIN_NEXT_FORM', defaultValue: '', description: 'Optional: next PRIMARY_FORM. Empty in form-oriented mode means automatic form rotation.')
     booleanParam(name: 'ENABLE_PERIODIC_ARTIFACT_PURGE', defaultValue: true, description: 'Every N builds, delete archived artifacts/allure reports of previous builds for this job.')
     string(name: 'PERIODIC_PURGE_EVERY', defaultValue: '5', description: 'Run full artifact purge every N-th build (integer >= 2).')
@@ -54,6 +32,9 @@ pipeline {
   }
 
   environment {
+    RUN_MODE = 'form-oriented'
+    FORM_SUITE = 'all'
+    PROVIDER_SCOPE = 'release_chain'
     PLAYWRIGHT_BROWSERS_PATH = '/var/lib/jenkins/cache/ms-playwright'
     PIP_CACHE_DIR = '/var/lib/jenkins/cache/pip'
     PIP_DISABLE_PIP_VERSION_CHECK = '1'
@@ -84,22 +65,16 @@ pipeline {
           if (!(params.RUN_CHROMIUM || params.RUN_FIREFOX || params.RUN_WEBKIT || params.RUN_MOBILE_CHROMIUM || params.RUN_MOBILE_WEBKIT)) {
             error('Select at least one browser/profile toggle.')
           }
-          if ((params.SITE ?: '').trim()) {
-            error('SITE parameter is not supported in URL-brand mode. Leave SITE empty.')
-          }
           if ((params.LOOP_DELAY_SECONDS ?: '').trim() && !((params.LOOP_DELAY_SECONDS as String) ==~ /\d+/)) {
             error('LOOP_DELAY_SECONDS must be an integer >= 0.')
           }
           if ((params.PERIODIC_PURGE_EVERY ?: '').trim() && !((params.PERIODIC_PURGE_EVERY as String) ==~ /\d+/)) {
             error('PERIODIC_PURGE_EVERY must be an integer >= 2.')
           }
-          if (params.RUN_MODE == 'form-oriented' && !(params.PRIMARY_FORM ?: '').trim()) {
+          if (!(params.PRIMARY_FORM ?: '').trim()) {
             error('PRIMARY_FORM is required when RUN_MODE=form-oriented.')
           }
-          if (params.RUN_MODE == 'form-oriented' && params.FORM_SUITE != 'all') {
-            error('FORM_SUITE must remain all when RUN_MODE=form-oriented; use PRIMARY_FORM.')
-          }
-          if (params.RUN_MODE == 'form-oriented' && params.ENABLE_CONTINUOUS_LOOP && !(params.CHAIN_NEXT_JOB ?: '').trim()) {
+          if (params.ENABLE_CONTINUOUS_LOOP && !(params.CHAIN_NEXT_JOB ?: '').trim()) {
             error('CHAIN_NEXT_JOB is required for a form-oriented continuous chain.')
           }
         }
@@ -726,12 +701,6 @@ PY
       echo "Build URL: ${env.BUILD_URL}"
       script {
         if (params.ENABLE_CONTINUOUS_LOOP) {
-          def autoNextScopeMap = [
-            'big_two_1of2': 'big_two_2of2',
-            'big_two_2of2': 'rtk_megafon',
-            'rtk_megafon': 'small_pool',
-            'small_pool': 'big_two_1of2',
-          ]
           def autoNextFormMap = [
             'profit': 'connection',
             'connection': 'checkaddress',
@@ -748,30 +717,15 @@ PY
             quietSeconds = 60
           }
           def nextJobName = (params.CHAIN_NEXT_JOB ?: '').trim()
-          def nextScope = (params.CHAIN_NEXT_SCOPE ?: '').trim()
           def nextForm = (params.CHAIN_NEXT_FORM ?: '').trim()
-          if (!nextScope) {
-            nextScope = autoNextScopeMap.get(params.PROVIDER_SCOPE as String, params.PROVIDER_SCOPE as String)
-          }
           if (!nextForm) {
             nextForm = autoNextFormMap.get(params.PRIMARY_FORM as String, params.PRIMARY_FORM as String)
           }
-          if (!nextJobName) {
-            if ((params.PROVIDER_SCOPE as String) == 'release_chain') {
-              nextJobName = env.JOB_NAME
-            } else {
-              nextJobName = nextScope
-            }
-          }
-          echo "Continuous loop enabled. Scheduling next build: job='${nextJobName}', scope='${nextScope}', delay=${quietSeconds}s."
+          echo "Continuous loop enabled. Scheduling next form job: job='${nextJobName}', primary_form='${nextForm}', delay=${quietSeconds}s."
           build job: nextJobName,
             wait: false,
             quietPeriod: quietSeconds,
             parameters: [
-              string(name: 'PROVIDER_SCOPE', value: nextScope),
-              string(name: 'SITE', value: params.SITE),
-              string(name: 'RUN_MODE', value: params.RUN_MODE),
-              string(name: 'FORM_SUITE', value: params.FORM_SUITE),
               string(name: 'PRIMARY_FORM', value: nextForm),
               string(name: 'CHAIN_NEXT_FORM', value: ''),
               string(name: 'SERVICE_MODE', value: params.SERVICE_MODE),

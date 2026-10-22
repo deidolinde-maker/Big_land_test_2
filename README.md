@@ -182,20 +182,14 @@ CLI-параметры определены в `conftest.py`:
 
 - `telegram_proxy_url`
 - `telegram_proxy_auth_secret`
-- `telegram_proxy_global_test`
+- `tg_proxy_creds_survarius`
+- `browser_proxy_creds`
 
 ## Jenkins: параметры job
 
 Ключевые параметры:
 
-- `PROVIDER_SCOPE`
-  - `release_chain`
-  - `big_two_1of2`
-  - `big_two_2of2`
-  - `rtk_megafon`
-  - `small_pool`
-  - или отдельный бренд (`mts`, `beeline`, `megafon`, `t2`, `rostelecom`, `domru`, `ttk`)
-- `FORM_SUITE` - `all` или конкретный suite.
+- `PRIMARY_FORM` - основная форма job: `profit`, `connection`, `checkaddress`, `undecided`, `moving` или `express`.
 - `SERVICE_MODE` - `core`, `variants`, `all`.
 - браузерные флаги:
   - `RUN_CHROMIUM`
@@ -213,24 +207,13 @@ CLI-параметры определены в `conftest.py`:
   - `ENABLE_CONTINUOUS_LOOP`
   - `LOOP_DELAY_SECONDS`
   - `CHAIN_NEXT_JOB`
-  - `CHAIN_NEXT_SCOPE`
+  - `CHAIN_NEXT_FORM` (необязательно; по умолчанию форма выбирается автоматически)
 - чистка артефактов:
   - `ENABLE_PERIODIC_ARTIFACT_PURGE`
   - `PERIODIC_PURGE_EVERY`
 
-Важно:
-
-- `SITE` в URL-режиме не используется, его нужно оставлять пустым.
-
-## Jenkins: маппинг scope
-
-Реализация в `run_scope()`:
-
-- `big_two_1of2` -> `mts (1/2)` + `beeline (1/2)`
-- `big_two_2of2` -> `mts (2/2)` + `beeline (2/2)`
-- `rtk_megafon` -> `rostelecom (1/1)` + `megafon (1/1)`
-- `small_pool` -> `domru (1/1)` + `ttk (1/1)`
-- `release_chain` -> последовательно `big_two_1of2 -> big_two_2of2 -> rtk_megafon -> small_pool`
+Внутри pipeline общий URL-скоуп всех активных брендов и режим
+`form-oriented` зафиксированы. Они больше не выбираются вручную в Jenkins.
 
 ## Jenkins: почему Allure может быть 0 и что сделано
 
@@ -261,19 +244,19 @@ CLI-параметры определены в `conftest.py`:
 
 ## Jenkins: как настроить авто-цепочку
 
-Базовый вариант:
+Для form-oriented цепочки:
 
 - включить `ENABLE_CONTINUOUS_LOOP=true`;
-- оставить `CHAIN_NEXT_JOB` и `CHAIN_NEXT_SCOPE` пустыми;
-- система сама выберет next scope по карте:
-  - `big_two_1of2 -> big_two_2of2`
-  - `big_two_2of2 -> rtk_megafon`
-  - `rtk_megafon -> small_pool`
-  - `small_pool -> big_two_1of2`
+- указать `CHAIN_NEXT_JOB` на следующую form-job;
+- оставить `CHAIN_NEXT_FORM` пустым, чтобы форма выбралась автоматически:
+  - `profit -> connection`
+  - `connection -> checkaddress`
+  - `checkaddress -> undecided`
+  - `undecided -> profit`
 
 Для ручного переопределения:
 
-- задайте `CHAIN_NEXT_JOB` и/или `CHAIN_NEXT_SCOPE`.
+- задайте `CHAIN_NEXT_JOB` и/или `CHAIN_NEXT_FORM`.
 
 ## Jenkins: как отключить автозапуски
 
@@ -309,19 +292,15 @@ CLI-параметры определены в `conftest.py`:
 - `New XHR/fetch after submit`
 - фактический URL после submit
 
-### 3) Suite пропускается как SKIP
+### 3) В form-oriented job нет URL
 
-Это штатно, если после фильтра `brand + form-suite + shard` не осталось URL.
+Проверьте, что выбранная `PRIMARY_FORM` присутствует в активном allowlist.
 
 Проверьте:
 
-- `urls/<brand>.txt`
-- `config/form_allowlists/<suite>.txt`
+- `urls/*.txt`
+- `config/form_allowlists/<primary_form>.txt`
 - override-правила в `config/form_expectations/*.json`
-
-### 4) Unknown PROVIDER_SCOPE
-
-Параметр `PROVIDER_SCOPE` содержит значение не из списка в `Jenkinsfile`.
 
 ## Практика обновления URL/ожиданий
 
@@ -330,8 +309,8 @@ CLI-параметры определены в `conftest.py`:
 1. Обновить URL в `urls/<brand>.txt`.
 2. Обновить allowlist suite в `config/form_allowlists/*.txt`.
 3. При необходимости добавить/исправить override в `config/form_expectations/<brand>.json`.
-4. Прогнать локально точечный `--url-brand --form-suite`.
-5. Запустить Jenkins scope и проверить Allure + Telegram.
+4. Прогнать локально `--run-mode=form-oriented --primary-form=<form>`.
+5. Запустить соответствующую form-job и проверить Allure + Telegram.
 
 ## Рекомендуемый минимальный smoke перед пушем
 
