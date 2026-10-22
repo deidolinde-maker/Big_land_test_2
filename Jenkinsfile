@@ -35,6 +35,7 @@ pipeline {
     string(name: 'LOOP_DELAY_SECONDS', defaultValue: '60', description: 'Delay before scheduling next loop build.')
     string(name: 'CHAIN_NEXT_JOB', defaultValue: '', description: 'Optional: next Jenkins job name for chained 24/7 run.')
     string(name: 'CHAIN_NEXT_SCOPE', defaultValue: '', description: 'Optional: PROVIDER_SCOPE value for next chained job.')
+    string(name: 'CHAIN_NEXT_FORM', defaultValue: '', description: 'Optional: next PRIMARY_FORM. Empty in form-oriented mode means automatic form rotation.')
     booleanParam(name: 'ENABLE_PERIODIC_ARTIFACT_PURGE', defaultValue: true, description: 'Every N builds, delete archived artifacts/allure reports of previous builds for this job.')
     string(name: 'PERIODIC_PURGE_EVERY', defaultValue: '5', description: 'Run full artifact purge every N-th build (integer >= 2).')
 
@@ -97,6 +98,9 @@ pipeline {
           }
           if (params.RUN_MODE == 'form-oriented' && params.FORM_SUITE != 'all') {
             error('FORM_SUITE must remain all when RUN_MODE=form-oriented; use PRIMARY_FORM.')
+          }
+          if (params.RUN_MODE == 'form-oriented' && params.ENABLE_CONTINUOUS_LOOP && !(params.CHAIN_NEXT_JOB ?: '').trim()) {
+            error('CHAIN_NEXT_JOB is required for a form-oriented continuous chain.')
           }
         }
       }
@@ -728,6 +732,12 @@ PY
             'rtk_megafon': 'small_pool',
             'small_pool': 'big_two_1of2',
           ]
+          def autoNextFormMap = [
+            'profit': 'connection',
+            'connection': 'checkaddress',
+            'checkaddress': 'undecided',
+            'undecided': 'profit',
+          ]
           int quietSeconds = 60
           try {
             quietSeconds = (params.LOOP_DELAY_SECONDS as Integer)
@@ -739,8 +749,12 @@ PY
           }
           def nextJobName = (params.CHAIN_NEXT_JOB ?: '').trim()
           def nextScope = (params.CHAIN_NEXT_SCOPE ?: '').trim()
+          def nextForm = (params.CHAIN_NEXT_FORM ?: '').trim()
           if (!nextScope) {
             nextScope = autoNextScopeMap.get(params.PROVIDER_SCOPE as String, params.PROVIDER_SCOPE as String)
+          }
+          if (!nextForm) {
+            nextForm = autoNextFormMap.get(params.PRIMARY_FORM as String, params.PRIMARY_FORM as String)
           }
           if (!nextJobName) {
             if ((params.PROVIDER_SCOPE as String) == 'release_chain') {
@@ -758,7 +772,8 @@ PY
               string(name: 'SITE', value: params.SITE),
               string(name: 'RUN_MODE', value: params.RUN_MODE),
               string(name: 'FORM_SUITE', value: params.FORM_SUITE),
-              string(name: 'PRIMARY_FORM', value: params.PRIMARY_FORM),
+              string(name: 'PRIMARY_FORM', value: nextForm),
+              string(name: 'CHAIN_NEXT_FORM', value: ''),
               string(name: 'SERVICE_MODE', value: params.SERVICE_MODE),
               string(name: 'BLOCKING_PROFILE', value: params.BLOCKING_PROFILE),
               string(name: 'LOOP_DELAY_SECONDS', value: params.LOOP_DELAY_SECONDS),
