@@ -1,0 +1,465 @@
+{
+  "https://blog.mts-home.online/": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://blog.mts-home.online/experts": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://blog.mts-home.online/perehod-na-mts-so-svoim-nomerom": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://internet-mts-home.online/": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://internet-mts-home.online/moskva": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://magnitogorsk.mts-home.online/all-tariffs/tariff-6": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.mts-home.online/": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.mts-home.online/address": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.mts-home.online/all-tariffs": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.mts-home.online/all-tariffs/mts-24": {
+    "missing": [
+      "profit",
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.mts-home.online/all-tariffs/mts-bolshe": {
+    "missing": [
+      "profit",
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.mts-home.online/all-tariffs/mts-doma-horosho": {
+    "missing": [
+      "profit",
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.mts-home.online/all-tariffs/mts-doma-otlichno": {
+    "missing": [
+      "profit",
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.mts-home.online/all-tariffs/mts-doma-super": {
+    "missing": [
+      "profit",
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.mts-home.online/all-tariffs/mts-kak-hochesh": {
+    "missing": [
+      "profit",
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.mts-home.online/all-tariffs/mts-proshche": {
+    "missing": [
+      "profit",
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.mts-home.online/all-tariffs/mts-riil-plus": {
+    "missing": [
+      "profit",
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.mts-home.online/all-tariffs/mts-super": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.mts-home.online/all-tariffs/tariff-1": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.mts-home.online/all-tariffs/tariff-1-1000": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.mts-home.online/all-tariffs/tariff-3": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.mts-home.online/all-tariffs/tariff-7": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.mts-home.online/bezlimitnyj-internet": {
+    "missing": [
+      "profit",
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.mts-home.online/contacts": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.mts-home.online/domashnij-internet": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.mts-home.online/internet-i-televidenie": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.mts-home.online/internet-tv-mobile": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.mts-home.online/mts-internet-proverit-adress-podklyucheniya": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.mts-home.online/offices": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.mts-home.online/pokrytie-4-5g": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.mts-home.online/semejnye-tarify": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.mts-home.online/sitemap": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.mts-home.online/support": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.mts-home.online/wi-fi-internet": {
+    "missing": [
+      "profit",
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home-online.ru/moskva/mobilnaya-svyaz": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/address": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/aznakaevo": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/bezlimitnyj-internet": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/bonusy": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/bonusy/vozvrashchaite-10-pri-popolnenii-scheta-mts": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/connect": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/domashnij-internet": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/forma-obratnoj-svyazi": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/goroda": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/help": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/help/kak-pomenyat-tarif-na-mts": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/internet-gpon": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/internet-i-mobilnaya-svyaz": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/internet-i-televidenie": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/internet-tv-mobile": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/kak-stat-abonentom": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/mobilnaya-svyaz/bolshe": {
+    "missing": [
+      "profit",
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/mobilnaya-svyaz/junior": {
+    "missing": [
+      "profit",
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/mobilnaya-svyaz/kak-hochesh": {
+    "missing": [
+      "profit",
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/mobilnaya-svyaz/membrana": {
+    "missing": [
+      "profit",
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/mobilnaya-svyaz/proshe": {
+    "missing": [
+      "profit",
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/mobilnaya-svyaz/riil": {
+    "missing": [
+      "profit",
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/mobilnaya-svyaz/super": {
+    "missing": [
+      "profit",
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/mts-internet-proverit-adress-podklyucheniya": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/o-kompanii": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/oborudovanie": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/perejti-so-svoim-nomerom": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/pokrytie-4-5g": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/reviews": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/semejnye-tarify": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/tv-kanaly": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/usluga-pereezd": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": [
+      "moving"
+    ]
+  },
+  "https://mts-home.online/uslugi": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/uslugi/usluga-belyj-internet-mts": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/vacancies": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://mts-home.online/wi-fi-internet": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://shcherbinka.mts-home.online/address/ul-rabocaja-id10443": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://shcherbinka.mts-home.online/address/ul-rabochaya-d-2-id203432": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  }
+}

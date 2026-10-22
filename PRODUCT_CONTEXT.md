@@ -1,0 +1,205 @@
+﻿# PRODUCT_CONTEXT
+Обновлено: 2026-05-04
+
+## 1. Общее описание продукта
+- Продукт: репозиторий автотестов `Everyday_test` для проверки лендингов интернет-провайдеров.
+- Состоит из двух независимых test-suite:
+  - Suite A: проверка форм заявок (`big_landing_code.py`).
+  - Suite B: проверка блока мобильных тарифов (`mobile_tariffs_tests/`).
+- Результаты публикуются в Allure; уведомления отправляются в Telegram.
+
+## 2. Цели и ценность
+- Рано обнаруживать регрессии на боевых лендингах.
+- Проверять, что ключевые пользовательские действия работают:
+  - открытие/заполнение/submit форм;
+  - переход в раздел мобильных тарифов и поведение CTA.
+- Выявлять недоступность сайтов и не блокировать общий прогон по всем доменам.
+- Давать операционные сигналы через step/tech/critical alert.
+
+## 3. Основные сущности
+- `Site` (Suite A): запись в провайдерном конфиге `config/providers/*.py` (домен + флаги сценария).
+- `Landing` (Suite B): запись в `LANDINGS` (url, nav/card селекторы, ожидаемый redirect type).
+- `Form type` (Suite A): `checkaddress`, `connection`, `profit`, `express-connection`, `business`.
+- `Popup cycle`: последовательный прогон кнопок, открывающих формы.
+- `City scenario`: выбор города + повторная проверка попапов для городского URL.
+- `Alert`:
+  - `step` (падение шага),
+  - `tech` (точечная техническая ошибка),
+  - `critical` (подтвержденная недоступность сайта).
+- `Allure artifacts`: result json, attachments, screenshot_on_failure, текстовые вложения.
+- `Redirect type` (Suite B): `new_tab`, `same_tab`, `modal`, `either`, `any`.
+
+## 4. Пользовательские роли
+- Инженер QA/автотестов:
+  - запускает тесты локально и в CI;
+  - анализирует падения по логам/Allure/Telegram.
+- Разработчик/поддержка лендингов:
+  - получает сигналы о поломках функционала.
+- Аналитик/операционный пользователь отчетов:
+  - использует итоговые статусы прогонов.
+- Владелец продукта/бизнес-пользователь: `Не определено`.
+- Формальный список ответственных за алерты Telegram: `Не определено`.
+
+## 5. Бизнес-логика
+- Suite A (`big_landing_code.py`):
+  - конфиги сайтов загружаются через provider-loader:
+    - источник: `config/providers/*.py`,
+    - runtime-слой совместимости: `site_configs.py` (`SITE_CONFIGS = load_site_configs()`),
+    - запуск по провайдеру: `--provider=<name>`,
+    - запуск по одному сайту: `--site=<domain>`,
+    - поддерживается комбинация `--provider + --site` с валидацией принадлежности сайта к провайдеру;
+  - поддерживаются режимы прогона `--service-mode`:
+    - `core`: для форм с `Place` выполняется один базовый submit (первый доступный вариант, обычно `В квартиру`);
+    - `variants`: выполняются только проверки вариантов `Place` (формы без `Place`, а также `profit` и `business`, пропускаются как неприменимые);
+    - `all`: полный режим с submit по всем доступным вариантам `Place`;
+  - сценарий по сайту: шаги `1 -> 2 -> 3 -> 4 -> 4a -> 4b`;
+  - success submit: URL содержит `/tilda/form1/submitted` или `/thanks`;
+  - submit проверяется с retry и grace-периодом;
+  - if the House field does not activate, test performs one full refill retry; if it still fails, the form is marked as `form_not_filled` without long submit wait;
+  - для форм с переключателем услуги `Place` заявка отправляется по каждому доступному варианту (`В квартиру`, `В частный дом`, `Для бизнеса`) в рамках одного попапа;
+  - исключения по `Place`: форма `profit` и форма `business` отправляются без переключения варианта услуги;
+  - после успешной отправки выполняется отдельная проверка шага `Закрытие страницы Спасибо и переход на главную без региона`:
+    - выход со страницы `thanks/submitted`,
+    - возврат на главную страницу того же лендинга,
+    - отсутствие видимого region-popup после возврата;
+  - автопоявляющийся `profit`-попап проверяется как полноценная форма (`fill -> submit -> confirm`), а не только закрывается;
+  - если `profit` всплывает во время проверки другой формы, тест сначала обрабатывает `profit`, затем возобновляет исходный сценарий (повторно открывает целевую форму и продолжает шаги);
+  - критическая недоступность сайта:
+    - `HTTP >= 400`, или
+    - суммарная неуспешная навигация `>= 60 сек`;
+  - при critical сайт скипается (`pytest.skip`), прогон продолжается по следующим сайтам;
+  - некритические ошибки (popup not found, no_confirmation, city issues) не переводятся в critical.
+  - step/tech/critical алерты отправляются в едином формате: время (MSK), лендинг, URL, текст шага/ошибки, детали, ссылка на run/отчет.
+  - итоговый CI-summary (`notify_from_allure.py`) использует агрегирование:
+    - 1–5 падений на лендинг: точечные пункты;
+    - >5 падений на лендинг: агрегированный блок лендинга;
+    - массовые падения на нескольких лендингах: сводный алерт;
+    - при восстановлении относительно предыдущего state: блок `Исправлено после восстановления`.
+  - поддерживается MVP-профиль блокировщиков `adblock-mvp` (routing-based блокировка рекламных/трекерных доменов); полноценная эмуляция антивирусов в CI не поддерживается.
+- Suite B (`mobile_tariffs_tests`):
+  - открыть лендинг -> закрыть региональный popup -> принять cookies -> перейти в мобильный раздел;
+  - проверить карточки и CTA;
+  - классифицировать результат CTA по redirect type;
+  - для лендингов с `expected_url_contains` дополнительно проверять целевой URL CTA по обязательным фрагментам;
+  - падение шага отправляет step-alert.
+
+## 6. Ключевые пользовательские сценарии
+- Локальный прогон всех сайтов Suite A.
+- Локальный прогон сайтов одного провайдера Suite A через `--provider=<name>`.
+- Локальный прогон одного сайта Suite A через `--site=<domain>`.
+- Локальный/CI прогон mobile suite полностью или с `landing_filter`.
+- Анализ падения:
+  - traceback pytest,
+  - Allure attachments,
+  - step/tech/critical сообщения в Telegram.
+- Добавление нового домена/лендинга:
+  - Suite A: обновление `config/providers/<provider>.py` (+ селекторы при необходимости),
+  - Suite B: обновление `LANDINGS`.
+
+## 7. Интерфейсы и разделы продукта
+- Интерфейсы запуска и наблюдения:
+  - CLI (`pytest`),
+  - GitHub Actions workflows,
+  - Allure report (артефакты + gh-pages),
+  - Telegram chat для алертов.
+- Проверяемые разделы целевых сайтов (Suite A):
+  - главная страница,
+  - popup-формы,
+  - `/business` (если применимо),
+  - сценарий выбора города.
+- Проверяемые разделы (Suite B):
+  - блок мобильных тарифов,
+  - карточки тарифов,
+  - кнопки CTA "Подключить".
+
+## 8. Интеграции
+- Playwright (browser automation, Chromium + Firefox + WebKit).
+- Pytest + плагины (`pytest-playwright`, `pytest-timeout`, `allure-pytest`).
+- Allure (локально и в CI).
+- Telegram Bot API:
+  - Suite A: step/tech/critical и summary;
+  - Suite B: step-alert и summary.
+- GitHub Actions + GitHub Pages (публикация отчета).
+- Внешние домены провайдеров (из `config/providers/*.py` и `LANDINGS`).
+- Интеграция с Advizer в коде: `Не определено` (используется как ручная сверка процесса).
+
+## 9. Технические особенности
+- Язык: Python.
+- Основной test-suite A:
+  - конфиг доменов: `config/providers/*.py` (+ runtime-совместимость через `site_configs.py`),
+  - валидация конфигов: `config/schema.py` (поля, типы, дубли доменов между провайдерами),
+  - загрузчик: `config/loader.py` (фильтрация `--provider`, `--site`, вычисление `city_name` из `cities`/`DEFAULT_CITY`),
+  - параметр запуска: `--provider` (фильтр по провайдеру),
+  - параметр запуска: `--service-mode` (`all` по умолчанию, также `core`, `variants`),
+  - параметр запуска: `--blocking-profile` (`none` по умолчанию, `adblock-mvp` для MVP-режима блокировщиков),
+  - мультибраузерный запуск: `pytest-playwright` `--browser` (локально и в CI),
+  - таймауты/ретраи:
+    - `NAV_GOTO_TIMEOUT_MS=20000`,
+    - `NAV_RETRIES=3`,
+    - `SITE_UNAVAILABLE_THRESHOLD_MS=60000`,
+    - `SUBMIT_CONFIRM_TIMEOUT_MS=25000`,
+    - `SUBMIT_CONFIRM_GRACE_MS=2000`.
+- Suite A включает fallback-селекторы для:
+  - cookies,
+  - region popup,
+  - city button/input/link.
+- Suite A содержит антифлак для city redirect:
+  - если URL уже сменился, выбор города считается успешным даже при timeout клика.
+- Suite A сохраняет детальную диагностику popup-ошибок в Allure:
+  - attachment `POPUP/BUSINESS failure details`,
+  - `first_fail` в step-alert и assertion.
+- `conftest.py` (корень) добавляет `screenshot_on_failure`.
+- Suite B:
+  - smoke-режим `SMOKE_CARD_LIMIT=3`,
+  - redirect type validation,
+  - опциональная URL-валидация CTA через `expected_url_contains` в `LANDINGS`,
+  - отдельный browser context на каждый тест.
+
+## 10. Текущее состояние проекта
+- Основная ветка: `master`.
+- Последние устойчивые изменения (по git log):
+  - `6c677be`: диагностика popup-fail (`first_fail`, Allure failure details),
+  - `bad6977`: fallback селекторы города/региона + антифлак city redirect,
+  - `2b0659f`: обновление городских настроек и домена T2,
+  - `a9d1a58`: отключен `/business` для `rt-internet.online` и `rtk-home-internet.ru`.
+- CI:
+  - основной контур Suite A: `provider-orchestrator.yml` + ручные `provider-<name>.yml` (MTS/Beeline/Megafon/T2/Rostelecom/Domru), запуск через `workflow_dispatch`;
+  - каждый `provider-<name>.yml` поддерживает desktop и mobile флаги запуска в одном workflow (`run_chromium`, `run_firefox`, `run_webkit`, `run_mobile_chromium`, `run_mobile_webkit`);
+  - `allure.yml` (формы): legacy/fallback workflow, только `workflow_dispatch` (без cron и без автозапуска по push).
+  - `allure.yml` выполняет clean multi-browser запуск:
+    - для ручного запуска поддержаны флаги `run_chromium` / `run_firefox` (можно прогонять только выбранные браузеры);
+    - `core/variants` запускаются только для выбранных браузеров, `variants` управляется `run_place_variants`;
+    - firefox-прогон не зависит от успешности chromium-прогона (ограничение "только после успешного шага" снято).
+    - для `core/variants` заданы step-timeout в workflow для ограничения длительных зависаний.
+  - adblock-профиль вынесен в отдельный ручной workflow `allure-adblock.yml` (`firefox` + `blocking_profile=adblock-mvp`).
+  - `allure.yml` сохраняет state агрегированных алертов в `notify_state.json` (публикуется в `gh-pages`) для детекции восстановления между прогонами.
+  - `mobile-tariffs.yml`: только `workflow_dispatch`, публикация Allure в `gh-pages/mobile-tariffs`.
+  - `provider-mobile-orchestrator.yml`: основной mobile matrix-контур (`smoke/all`, `core/variants`, `chromium/webkit`) с публикацией в `gh-pages/provider-mobile-orchestrator/`.
+  - временные provider-specific mobile pilot workflows удалены как дублирующие, mobile rollout централизован через orchestrator и mobile-тумблеры в provider workflow.
+- Количество конфигов на 2026-04-13:
+  - Suite A: 23 сайта,
+  - Suite B: 10 лендингов.
+
+## 11. Правила изменений
+- Источник правды по поведению тестов: код (`big_landing_code.py`, `mobile_tariffs_tests/*`), затем документация.
+- Любые изменения в продуктовой логике тестов:
+  - обновлять этот файл,
+  - не добавлять недоказанные факты,
+  - неизвестное помечать `Не определено`,
+  - спорное заносить в раздел `Требует уточнения`.
+- При изменении доменов/селекторов:
+  - фиксировать причину изменения,
+  - делать точечные прогоны по затронутым доменам,
+  - проверять Allure attachments и текст step-alert.
+- Для outage-логики:
+  - не расширять critical-критерии без явного согласования.
+
+## 12. Требует уточнения
+- Официальный SLA доступности лендингов и допустимые окна деградации.
+- Финальный список получателей и каналов для `critical` алертов.
+- Нужна ли обратная совместимость для старых `--site` алиасов (пример: старый T2-домен).
+- Нужно ли переводить предупреждение `Поле Имя не найдено` в fail для некоторых сайтов.
+- Нужно ли хранить и версионировать эталонные селекторы отдельно от тестового кода.
+- Нужна ли официальная поддержка запуска в Windows cp1251 без `PYTHONIOENCODING=utf-8`.
+- Явная политика для “флаков” (авторетрай в CI, quarantine, доп. метки в Allure): `Не определено`.
+

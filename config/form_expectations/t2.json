@@ -1,0 +1,92 @@
+{
+  "https://t2-ru.online": {
+    "missing": [
+      "business",
+      "checkaddress",
+      "express-connection",
+      "moving",
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://t2-ru.online/": {
+    "missing": [
+      "business",
+      "checkaddress",
+      "express-connection",
+      "moving",
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://t2-ru.online/besplatnyj-domashnij-internet-tele2": {
+    "missing": [
+      "business",
+      "checkaddress",
+      "express-connection",
+      "moving",
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://t2-ru.online/help": {
+    "missing": [
+      "business",
+      "checkaddress",
+      "express-connection",
+      "moving",
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://t2-ru.online/help/kak-zaregistrirovatsya-v-lichnom-kabinete-t2": {
+    "missing": [
+      "business",
+      "checkaddress",
+      "express-connection",
+      "moving",
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://t2-ru.online/mobilnaya-svyaz": {
+    "missing": [
+      "business",
+      "checkaddress",
+      "express-connection",
+      "moving",
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://t2-ru.online/news-list": {
+    "missing": [
+      "business",
+      "checkaddress",
+      "express-connection",
+      "moving",
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://t2-ru.online/sankt-peterburg": {
+    "missing": [
+      "business",
+      "checkaddress",
+      "express-connection",
+      "moving",
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://t2-ru.online/sankt-peterburg/mobilnaya-svyaz": {
+    "missing": [
+      "business",
+      "checkaddress",
+      "express-connection",
+      "moving",
+      "undecided"
+    ],
+    "force_present": []
+  }
+}

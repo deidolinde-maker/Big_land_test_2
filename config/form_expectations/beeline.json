@@ -1,0 +1,420 @@
+{
+  "https://beeline-home.online/": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-home.online/moskva": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-internet.online/": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-internet.online/business": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": [
+      "business"
+    ]
+  },
+  "https://beeline-internet.online/krasnodar": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-internet.online/moskva": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-ru.online/": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-ru.online/bonuses": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-ru.online/bonuses/vygodnye-ceny-na-komplekt-bilajn-tv": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-ru.online/connect": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-ru.online/contacts": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-ru.online/coverage-map": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-ru.online/forma-obratnoj-svyazi": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-ru.online/goroda": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-ru.online/help": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-ru.online/help/ustranenie-nepoladok-po-domashnemu-internetu-beeline": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-ru.online/internet-gpon": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-ru.online/kak-stat-abonentom": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-ru.online/o-kompanii": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-ru.online/offices": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-ru.online/perejti-so-svoim-nomerom": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-ru.online/pokrytie-4-5g": {
+    "missing": [
+      "checkaddress",
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-ru.online/proverit-adress-podklyucheniya": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-ru.online/sitemap": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-ru.online/support": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-ru.online/tariff-udobnyj-dlya-doma": {
+    "missing": [
+      "checkaddress",
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-ru.online/tarify-dlya-noutbuka": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-ru.online/tarify-dlya-plansheta": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-ru.online/vacancies": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-ru.online/wi-fi-internet": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-ru.online/yuzhno-sahalinsk": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-ru.pro/": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-ru.pro/barnaul": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-ru.pro/moskovskaya_oblast": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-ru.pro/moskva": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beeline-ru.pro/sankt-peterburg": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beelline-internet.ru/": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beelline-internet.ru/moskva": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://beelline-internet.ru/sankt-peterburg": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://blog.beeline-ru.online/": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://blog.beeline-ru.online/kak-podklyuchit-internet-bilajn": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.beeline-ru.online/business": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": [
+      "business"
+    ]
+  },
+  "https://moskva.beeline-ru.online/connect": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.beeline-ru.online/contacts": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.beeline-ru.online/coverage-map": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.beeline-ru.online/domashnij-internet-tv": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.beeline-ru.online/internet-gpon": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.beeline-ru.online/internet-tv-mobile": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.beeline-ru.online/offices": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.beeline-ru.online/pokrytie-4-5g": {
+    "missing": [
+      "checkaddress",
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.beeline-ru.online/proverit-adress-podklyucheniya": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.beeline-ru.online/sitemap": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.beeline-ru.online/support": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.beeline-ru.online/tariff-udobnyj-dlya-doma": {
+    "missing": [
+      "checkaddress",
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.beeline-ru.online/tariffs-up": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.beeline-ru.online/tariffs-up/tariff-up-bee": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.beeline-ru.online/tariffs-up/tariff-up-cat": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.beeline-ru.online/tariffs-up/tariff-up-dragon": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.beeline-ru.online/tariffs-up/tariff-up-prodvinutyj": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.beeline-ru.online/tariffs-up/tariff-up-semejnyj": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.beeline-ru.online/tarify-dlya-noutbuka": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.beeline-ru.online/tarify-dlya-plansheta": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.beeline-ru.online/wi-fi-internet": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://online-beeline.ru/": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://online-beeline.ru/business": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": [
+      "business"
+    ]
+  },
+  "https://online-beeline.ru/moskva": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://sankt-peterburg.beeline-ru.online/all-tariffs": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://sankt-peterburg.beeline-ru.online/domashnij-internet": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  }
+}

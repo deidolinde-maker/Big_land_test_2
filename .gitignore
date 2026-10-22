@@ -1,0 +1,12 @@
+﻿__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+pytest-cache-files-*/
+allure-results/
+allure-report/
+photo_2026-04-27_12-43-53.jpg
+allure-results-*/
+tmp/
+_mobile_orchestrator_suites_latest.json
+*.log

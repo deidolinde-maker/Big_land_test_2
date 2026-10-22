@@ -1,0 +1,20 @@
+{
+  "https://dom-provider.online/moskva": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.providerdom.ru/domashnij-internet": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.providerdom.ru/internet-i-televidenie": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  }
+}

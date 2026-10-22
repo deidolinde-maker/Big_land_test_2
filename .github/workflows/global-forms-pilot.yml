@@ -1,0 +1,465 @@
+name: Global Forms Pilot (Provider x Form Suite)
+
+on:
+  workflow_dispatch:
+    inputs:
+      provider_scope:
+        description: "Набор провайдеров"
+        required: true
+        default: "big_two"
+        type: choice
+        options:
+          - pre_release_chain
+          - big_two
+          - rtk_megafon
+          - small_pool
+          - all
+          - beeline_split
+          - mts
+          - beeline
+          - megafon
+          - t2
+          - rostelecom
+          - domru
+          - ttk
+      form_suite:
+        description: "Тип формы (или all)"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - profit
+          - connection
+          - connection_cards
+          - checkaddress
+          - business
+          - undecided
+          - moving
+          - express
+      service_mode:
+        description: "Режим submit"
+        required: true
+        default: "core"
+        type: choice
+        options:
+          - core
+          - variants
+          - all
+      max_parallel:
+        description: "Максимум параллельных matrix-джоб"
+        required: true
+        default: "2"
+        type: choice
+        options:
+          - "1"
+          - "2"
+          - "3"
+          - "4"
+      provider_sequence:
+        description: "Гонять по брендам последовательно (цепочка: следующий после завершения предыдущего)"
+        required: true
+        default: false
+        type: boolean
+      url_shard_total:
+        description: "Деление URL на части (1 = без деления, 2 = запуск половины)"
+        required: true
+        default: "1"
+        type: choice
+        options:
+          - "1"
+          - "2"
+      url_shard_index:
+        description: "Какую часть запускать (используется при url_shard_total=2)"
+        required: true
+        default: "1"
+        type: choice
+        options:
+          - "1"
+          - "2"
+      run_chromium:
+        description: "Запустить Chromium"
+        required: true
+        default: true
+        type: boolean
+      run_firefox:
+        description: "Запустить Firefox"
+        required: true
+        default: false
+        type: boolean
+      run_webkit:
+        description: "Запустить WebKit"
+        required: true
+        default: false
+        type: boolean
+
+jobs:
+  build_matrix:
+    name: Build Matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.build.outputs.matrix }}
+      matrix_stage1: ${{ steps.build.outputs.matrix_stage1 }}
+      matrix_stage2: ${{ steps.build.outputs.matrix_stage2 }}
+      matrix_stage3: ${{ steps.build.outputs.matrix_stage3 }}
+      effective_max_parallel: ${{ steps.build.outputs.effective_max_parallel }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build provider x form suite matrix
+        id: build
+        shell: bash
+        env:
+          PROVIDER_SCOPE: ${{ inputs.provider_scope }}
+          FORM_SUITE: ${{ inputs.form_suite }}
+          URL_SHARD_INDEX: ${{ inputs.url_shard_index }}
+          URL_SHARD_TOTAL: ${{ inputs.url_shard_total }}
+          MAX_PARALLEL: ${{ inputs.max_parallel }}
+          PROVIDER_SEQUENCE: ${{ inputs.provider_sequence }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from config.url_loader import build_site_configs_from_urls
+
+          all_providers = ["mts", "beeline", "rostelecom", "megafon", "t2", "domru", "ttk"]
+          suites_all = [
+              "profit",
+              "connection",
+              "connection_cards",
+              "checkaddress",
+              "business",
+              "undecided",
+              "moving",
+              "express",
+          ]
+
+          provider_scope = (os.getenv("PROVIDER_SCOPE") or "big_two").strip()
+          form_suite = (os.getenv("FORM_SUITE") or "all").strip()
+          url_shard_index = int((os.getenv("URL_SHARD_INDEX") or "1").strip())
+          url_shard_total = int((os.getenv("URL_SHARD_TOTAL") or "1").strip())
+          max_parallel = int((os.getenv("MAX_PARALLEL") or "2").strip())
+          provider_sequence = (os.getenv("PROVIDER_SEQUENCE") or "false").strip().lower() == "true"
+          if provider_scope == "pre_release_chain":
+              # Для предрелизного сценария всегда запускаем последовательную цепочку брендов.
+              provider_sequence = True
+
+          if provider_scope == "beeline_split":
+              # Для auto-split режима шард задаётся внутри матрицы.
+              # Ручные inputs url_shard_* игнорируем, чтобы не падать на несовместимых значениях.
+              url_shard_index = 1
+              url_shard_total = 1
+          else:
+              if url_shard_total < 1:
+                  raise SystemExit("url_shard_total должен быть >= 1")
+              if url_shard_index < 1 or url_shard_index > url_shard_total:
+                  raise SystemExit("url_shard_index должен быть в диапазоне [1..url_shard_total]")
+
+          providers_by_scope = {
+              "pre_release_chain": all_providers,
+              "big_two": ["mts", "beeline"],
+              "rtk_megafon": ["rostelecom", "megafon"],
+              "small_pool": ["t2", "domru", "ttk"],
+              "all": all_providers,
+          }
+          suites = suites_all if form_suite == "all" else [form_suite]
+
+          def has_urls_for_combo(brand: str, suite: str, shard_index: int, shard_total: int) -> bool:
+              try:
+                  cfg = build_site_configs_from_urls(
+                      brand=brand,
+                      form_suite=suite,
+                      url_shard_index=shard_index,
+                      url_shard_total=shard_total,
+                  )
+              except Exception as exc:
+                  print(
+                      f"SKIP combo brand={brand} suite={suite} shard={shard_index}/{shard_total}: {exc}"
+                  )
+                  return False
+              return bool(cfg)
+
+          matrix = []
+          matrix_stage1 = []
+          matrix_stage2 = []
+          matrix_stage3 = []
+
+          def build_provider_entry(
+              *,
+              brand: str,
+              shard_index: int,
+              shard_total: int,
+              suite_label: str,
+          ) -> dict | None:
+              runnable_suites = [
+                  suite for suite in suites
+                  if has_urls_for_combo(brand, suite, shard_index, shard_total)
+              ]
+              if not runnable_suites:
+                  print(
+                      f"SKIP provider={brand} shard={shard_index}/{shard_total}: no runnable suites"
+                  )
+                  return None
+              shard_suffix = (
+                  f"-{shard_index}of{shard_total}"
+                  if shard_total > 1
+                  else ""
+              )
+              return {
+                  "brand": brand,
+                  "brand_label": f"{brand}{shard_suffix}",
+                  "suite_label": suite_label,
+                  "suites_csv": ",".join(runnable_suites),
+                  "url_shard_index": shard_index,
+                  "url_shard_total": shard_total,
+              }
+
+          if provider_scope == "pre_release_chain":
+              # Предрелизная цепочка:
+              # 1) mts+beeline по 2 шарда
+              # 2) rostelecom+megafon целиком
+              # 3) small pool целиком
+              stage1_plan = [
+                  ("mts", 1, 2),
+                  ("mts", 2, 2),
+                  ("beeline", 1, 2),
+                  ("beeline", 2, 2),
+              ]
+              stage2_plan = [
+                  ("rostelecom", 1, 1),
+                  ("megafon", 1, 1),
+              ]
+              stage3_plan = [
+                  ("t2", 1, 1),
+                  ("domru", 1, 1),
+                  ("ttk", 1, 1),
+              ]
+
+              for brand, shard_idx, shard_total in stage1_plan:
+                  item = build_provider_entry(
+                      brand=brand,
+                      shard_index=shard_idx,
+                      shard_total=shard_total,
+                      suite_label=form_suite,
+                  )
+                  if item:
+                      matrix_stage1.append(item)
+              for brand, shard_idx, shard_total in stage2_plan:
+                  item = build_provider_entry(
+                      brand=brand,
+                      shard_index=shard_idx,
+                      shard_total=shard_total,
+                      suite_label=form_suite,
+                  )
+                  if item:
+                      matrix_stage2.append(item)
+              for brand, shard_idx, shard_total in stage3_plan:
+                  item = build_provider_entry(
+                      brand=brand,
+                      shard_index=shard_idx,
+                      shard_total=shard_total,
+                      suite_label=form_suite,
+                  )
+                  if item:
+                      matrix_stage3.append(item)
+
+              matrix = matrix_stage1 + matrix_stage2 + matrix_stage3
+          elif provider_scope == "beeline_split" and provider_sequence:
+              for shard_idx in (1, 2):
+                  item = build_provider_entry(
+                      brand="beeline",
+                      shard_index=shard_idx,
+                      shard_total=2,
+                      suite_label=form_suite,
+                  )
+                  if item:
+                      matrix.append(item)
+          elif provider_scope == "beeline_split":
+              for suite in suites:
+                  if has_urls_for_combo("beeline", suite, 1, 2):
+                      matrix.append(
+                          {
+                              "brand": "beeline",
+                              "brand_label": "beeline-1of2",
+                              "suite_label": suite,
+                              "suites_csv": suite,
+                              "url_shard_index": 1,
+                              "url_shard_total": 2,
+                          }
+                      )
+                  if has_urls_for_combo("beeline", suite, 2, 2):
+                      matrix.append(
+                          {
+                              "brand": "beeline",
+                              "brand_label": "beeline-2of2",
+                              "suite_label": suite,
+                              "suites_csv": suite,
+                              "url_shard_index": 2,
+                              "url_shard_total": 2,
+                          }
+                      )
+          else:
+              providers = providers_by_scope.get(provider_scope, [provider_scope])
+              shard_suffix = (
+                  f"-{url_shard_index}of{url_shard_total}"
+                  if url_shard_total > 1
+                  else ""
+              )
+              if provider_sequence:
+                  for provider in providers:
+                      runnable_suites = [
+                          suite for suite in suites
+                          if has_urls_for_combo(provider, suite, url_shard_index, url_shard_total)
+                      ]
+                      if not runnable_suites:
+                          print(
+                              f"SKIP provider={provider} shard={url_shard_index}/{url_shard_total}: "
+                              "no runnable suites"
+                          )
+                          continue
+                      matrix.append(
+                          {
+                              "brand": provider,
+                              "brand_label": f"{provider}{shard_suffix}",
+                              "suite_label": form_suite,
+                              "suites_csv": ",".join(runnable_suites),
+                              "url_shard_index": url_shard_index,
+                              "url_shard_total": url_shard_total,
+                          }
+                      )
+              else:
+                  for suite in suites:
+                      for provider in providers:
+                          if not has_urls_for_combo(provider, suite, url_shard_index, url_shard_total):
+                              continue
+                          matrix.append(
+                              {
+                                  "brand": provider,
+                                  "brand_label": f"{provider}{shard_suffix}",
+                                  "suite_label": suite,
+                                  "suites_csv": suite,
+                                  "url_shard_index": url_shard_index,
+                                  "url_shard_total": url_shard_total,
+                              }
+                          )
+          print("Matrix size:", len(matrix))
+          print(json.dumps(matrix, ensure_ascii=False))
+
+          effective_max_parallel = 1 if provider_sequence else max_parallel
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write(f"matrix={json.dumps(matrix)}\n")
+              fh.write(f"matrix_stage1={json.dumps(matrix_stage1)}\n")
+              fh.write(f"matrix_stage2={json.dumps(matrix_stage2)}\n")
+              fh.write(f"matrix_stage3={json.dumps(matrix_stage3)}\n")
+              fh.write(f"effective_max_parallel={effective_max_parallel}\n")
+          PY
+
+  pilot:
+    name: Pilot • ${{ matrix.brand_label }} • ${{ matrix.suite_label }}
+    needs: build_matrix
+    runs-on: ubuntu-latest
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      TELEGRAM_PROXY_URL: ${{ secrets.TELEGRAM_PROXY_URL }}
+      TELEGRAM_PROXY_AUTH_SECRET: ${{ secrets.TELEGRAM_PROXY_AUTH_SECRET }}
+      TELEGRAM_PROXY_CREDS: ${{ secrets.TELEGRAM_PROXY_CREDS }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    strategy:
+      fail-fast: false
+      max-parallel: ${{ fromJson(needs.build_matrix.outputs.effective_max_parallel) }}
+      matrix:
+        include: ${{ fromJson(needs.build_matrix.outputs.matrix) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install Playwright browsers
+        run: |
+          sudo apt-get update
+          python -m playwright install --with-deps chromium firefox webkit
+
+      - name: Run in Chromium
+        if: ${{ inputs.run_chromium }}
+        run: |
+          IFS=',' read -ra suites <<< "${{ matrix.suites_csv }}"
+          for suite in "${suites[@]}"; do
+            echo "Running Chromium: brand=${{ matrix.brand }}, suite=${suite}, shard=${{ matrix.url_shard_index }}/${{ matrix.url_shard_total }}"
+            python -m pytest big_landing_code.py \
+              -rs \
+              --url-brand=${{ matrix.brand }} \
+              --form-suite="${suite}" \
+              --url-shard-index=${{ matrix.url_shard_index }} \
+              --url-shard-total=${{ matrix.url_shard_total }} \
+              --service-mode=${{ inputs.service_mode }} \
+              --browser=chromium \
+              --execution-profile=desktop \
+              --blocking-profile=none \
+              --alluredir=allure-results
+          done
+
+      - name: Run in Firefox
+        if: ${{ inputs.run_firefox }}
+        run: |
+          IFS=',' read -ra suites <<< "${{ matrix.suites_csv }}"
+          for suite in "${suites[@]}"; do
+            echo "Running Firefox: brand=${{ matrix.brand }}, suite=${suite}, shard=${{ matrix.url_shard_index }}/${{ matrix.url_shard_total }}"
+            python -m pytest big_landing_code.py \
+              -rs \
+              --url-brand=${{ matrix.brand }} \
+              --form-suite="${suite}" \
+              --url-shard-index=${{ matrix.url_shard_index }} \
+              --url-shard-total=${{ matrix.url_shard_total }} \
+              --service-mode=${{ inputs.service_mode }} \
+              --browser=firefox \
+              --execution-profile=desktop \
+              --blocking-profile=none \
+              --alluredir=allure-results
+          done
+
+      - name: Run in WebKit
+        if: ${{ inputs.run_webkit }}
+        run: |
+          IFS=',' read -ra suites <<< "${{ matrix.suites_csv }}"
+          for suite in "${suites[@]}"; do
+            echo "Running WebKit: brand=${{ matrix.brand }}, suite=${suite}, shard=${{ matrix.url_shard_index }}/${{ matrix.url_shard_total }}"
+            python -m pytest big_landing_code.py \
+              -rs \
+              --url-brand=${{ matrix.brand }} \
+              --form-suite="${suite}" \
+              --url-shard-index=${{ matrix.url_shard_index }} \
+              --url-shard-total=${{ matrix.url_shard_total }} \
+              --service-mode=${{ inputs.service_mode }} \
+              --browser=webkit \
+              --execution-profile=desktop \
+              --blocking-profile=none \
+              --alluredir=allure-results
+          done
+
+      - name: Upload Allure results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-${{ matrix.brand_label }}-${{ matrix.suite_label }}
+          path: allure-results
+          if-no-files-found: ignore
+
+      - name: Upload Playwright videos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: videos-${{ matrix.brand_label }}-${{ matrix.suite_label }}
+          path: artifacts/videos
+          if-no-files-found: ignore

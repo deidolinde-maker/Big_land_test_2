@@ -1,0 +1,20 @@
+{
+  "https://moskva.mega-home-internet.ru/domashnij-internet": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.mega-home-internet.ru/internet-tv": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  },
+  "https://moskva.mega-home-internet.ru/internet-tv-mobile": {
+    "missing": [
+      "undecided"
+    ],
+    "force_present": []
+  }
+}
