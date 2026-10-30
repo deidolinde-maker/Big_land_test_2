@@ -19,8 +19,8 @@ def runBrand(String fixedScope) {
           "NOTIFY_MODE=twice_daily",
           "PYTHONUNBUFFERED=1",
           "PW_VIDEO_DIR=artifacts/videos",
-          "SUMMARY_STATE_FILE=/var/lib/jenkins/shared/big_landing_test/summary_state.json",
-          "ALERT_STATE_FILE=/var/lib/jenkins/shared/big_landing_test/alert_state.json",
+          "SUMMARY_STATE_FILE=/var/lib/jenkins/shared/big_land_test_2/summary_${fixedScope}.json",
+          "ALERT_STATE_FILE=/var/lib/jenkins/shared/big_land_test_2/alert_${fixedScope}.json",
           "PLAYWRIGHT_BROWSERS_PATH=/var/lib/jenkins/cache/ms-playwright",
           "PIP_CACHE_DIR=/var/lib/jenkins/cache/pip",
         ]) {
