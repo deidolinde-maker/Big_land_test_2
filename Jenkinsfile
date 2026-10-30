@@ -1,3 +1,4 @@
+// Archived universal pipeline. New Jenkins jobs use Jenkinsfile.<scope>.
 pipeline {
   agent any
 
