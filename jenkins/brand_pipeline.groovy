@@ -1,6 +1,5 @@
 def runBrand(String fixedScope) {
-  node {
-    timestamps {
+  timestamps {
       def testFailure = null
       def testFile = "scenarios/${fixedScope}.py"
 
@@ -98,7 +97,6 @@ PY
       if (testFailure != null) {
         throw testFailure
       }
-    }
   }
 }
 

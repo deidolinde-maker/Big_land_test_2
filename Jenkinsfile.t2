@@ -1,5 +1,6 @@
 def pipeline
 node {
+  checkout scm
   pipeline = load 'jenkins/brand_pipeline.groovy'
+  pipeline.runBrand('t2')
 }
-pipeline.runBrand('t2')
