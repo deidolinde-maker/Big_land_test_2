@@ -2850,22 +2850,9 @@ def _run_popup_cycle(page: Page, buttons: list, base_url: str,
 
         reported_form_type = form_type
         if expected_form_types and form_type not in expected_form_types:
-            alias_form_type = _resolve_expected_form_alias(
-                base_url=base_url,
-                expected_form_types=expected_form_types,
-                detected_form_type=form_type,
-                form_hint=form_hint,
-            )
-            if alias_form_type:
-                reported_form_type = alias_form_type
-                print(
-                    f"  [{label}] Alias формы '{form_type}' -> '{reported_form_type}' "
-                    f"для URL {base_url}"
-                )
-            else:
-                print(f"  [{label}] Пропуск формы '{form_type}': не в expected_form_types")
-                close_popup_or_page(page)
-                continue
+            print(f"  [{label}] Пропуск формы '{form_type}': не в expected_form_types")
+            close_popup_or_page(page)
+            continue
 
         if reported_form_type in successful_form_types:
             print(
