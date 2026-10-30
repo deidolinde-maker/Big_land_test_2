@@ -20,6 +20,7 @@ def runBrand(String fixedScope) {
           "ALERT_STATE_FILE=/var/lib/jenkins/shared/big_land_test_2/alert_${fixedScope}.json",
           "PLAYWRIGHT_BROWSERS_PATH=/var/lib/jenkins/cache/ms-playwright",
           "PIP_CACHE_DIR=/var/lib/jenkins/cache/pip",
+          "VENV_DIR=/var/lib/jenkins/cache/big_land_test_2/venv_${fixedScope}",
         ]) {
           try {
             stage('Checkout') {
@@ -29,11 +30,15 @@ def runBrand(String fixedScope) {
             stage('Prepare Python') {
               sh '''
                 set -e
-                if [ ! -x .venv/bin/python ]; then
-                  python3 -m venv .venv
+                mkdir -p "${PIP_CACHE_DIR}" "${PLAYWRIGHT_BROWSERS_PATH}" "$(dirname "${VENV_DIR}")"
+                if [ ! -x "${VENV_DIR}/bin/python" ]; then
+                  python3 -m venv "${VENV_DIR}"
                 fi
-                .venv/bin/python -m pip install --cache-dir "${PIP_CACHE_DIR}" -r requirements.txt
-                .venv/bin/python -m playwright install chromium
+                "${VENV_DIR}/bin/python" -m pip install \
+                  --cache-dir "${PIP_CACHE_DIR}" \
+                  --prefer-binary \
+                  -r requirements.txt
+                "${VENV_DIR}/bin/python" -m playwright install chromium
               '''
             }
 
@@ -42,7 +47,7 @@ def runBrand(String fixedScope) {
                 set -e
                 rm -rf allure-results allure-results-* || true
                 mkdir -p allure-results
-                .venv/bin/python -m pytest ${testFile} \\
+                "${VENV_DIR}/bin/python" -m pytest ${testFile} \\
                   --alluredir=allure-results \\
                   --timeout=600 -s \\
                   --service-mode=all \\
@@ -64,9 +69,9 @@ def runBrand(String fixedScope) {
                 export RUN_URL="${BUILD_URL}"
                 export ALLURE_URL="${BUILD_URL}allure/"
                 export TELEGRAM_ALERT_EVENTS_FILE="telegram_alert_events.jsonl"
-                .venv/bin/python notify_from_allure.py || true
+                "${VENV_DIR}/bin/python" notify_from_allure.py || true
                 if [ -s telegram_alert_message.txt ] && [ "$(cat telegram_alert_should_send.txt 2>/dev/null | tr -d '[:space:]')" = "1" ]; then
-                  .venv/bin/python - <<'PY'
+                  "${VENV_DIR}/bin/python" - <<'PY'
 from pathlib import Path
 from notification_transport import send_telegram_alert
 text = Path("telegram_alert_message.txt").read_text(encoding="utf-8").strip()
@@ -75,7 +80,7 @@ if text:
 PY
                 fi
                 if [ -s telegram_message.txt ] && [ "$(cat telegram_should_send.txt 2>/dev/null | tr -d '[:space:]')" = "1" ]; then
-                  .venv/bin/python - <<'PY'
+                  "${VENV_DIR}/bin/python" - <<'PY'
 from pathlib import Path
 from notification_transport import send_telegram_alert
 text = Path("telegram_message.txt").read_text(encoding="utf-8").strip()
