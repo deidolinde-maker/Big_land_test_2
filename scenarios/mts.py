@@ -672,8 +672,7 @@ POPUP_REPEAT_NO_CONFIRMATION_SKIP_THRESHOLD = 2
 
 SERVICE_MODE_ALL = "all"
 SERVICE_MODE_CORE = "core"
-SERVICE_MODE_VARIANTS = "variants"
-SERVICE_MODE_CHOICES = {SERVICE_MODE_ALL, SERVICE_MODE_CORE, SERVICE_MODE_VARIANTS}
+SERVICE_MODE_CHOICES = {SERVICE_MODE_ALL, SERVICE_MODE_CORE}
 def get_execution_profile_name() -> str:
     return (os.getenv("PYTEST_EXECUTION_PROFILE") or "desktop").strip().lower()
 
@@ -1515,16 +1514,6 @@ def resolve_service_values_for_mode(
     service_mode: str,
 ) -> list[str | None]:
     mode = normalize_service_mode(service_mode)
-
-    if mode == SERVICE_MODE_VARIANTS:
-        if form_type == "profit":
-            print("  [FORM] VARIANTS: тип формы без Place — пропускаем")
-            return []
-        if detected_service_values:
-            print(f"  [FORM] VARIANTS: submit по Place: {', '.join(detected_service_values)}")
-            return detected_service_values
-        print("  [FORM] VARIANTS: Place не найден — пропускаем")
-        return []
 
     if form_type == "profit":
         return [None]
@@ -2510,10 +2499,6 @@ def process_auto_profit_popup(
     site_label = base_url.replace("https://", "").replace("http://", "").strip("/")
     sep = "=" * 55
     print(f"\n{sep}\n[AUTO-PROFIT] Проверка автопопапа\n{sep}")
-
-    if normalize_service_mode(service_mode) == SERVICE_MODE_VARIANTS:
-        print("  [AUTO-PROFIT] VARIANTS-режим: автопопап не проверяем")
-        return 0, 0, None, False
 
     nav_ok, nav_critical, nav_reason = safe_goto(page, base_url)
     if not nav_ok:
@@ -3984,9 +3969,7 @@ def run_site_scenario(page: Page, cfg: dict):
 
     # ── 1. Форма checkaddress ─────────────────────────────────────────────
     with allure.step("Шаг 1: форма checkaddress"):
-        if service_mode == SERVICE_MODE_VARIANTS:
-            mark_step_not_applicable(site_label, "1", "форма checkaddress", "service_mode=variants")
-        elif ("checkaddress" in expected_forms) if is_url_mode else cfg.get("has_checkaddress"):
+        if ("checkaddress" in expected_forms) if is_url_mode else cfg.get("has_checkaddress"):
             print(f"\n{sep}\n[{site_label}] Шаг 1: форма checkaddress\n{sep}")
             goto_or_handle_step(page, base_url, site_label, "1", "форма checkaddress")
             close_overlays(page)
