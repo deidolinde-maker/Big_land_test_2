@@ -1,18 +1,7 @@
-"""
-Универсальный тест форм для сайтов интернет-провайдеров.
+"""Independent rtk scenario.
 
-Запуск для конкретного сайта:
-    pytest -s --headed --site=mts-home-gpon.ru
-
-Запуск для всех сайтов последовательно:
-    pytest -s --headed  (прогоняет все сайты из provider-конфигов)
-    pytest test_universal2.py --alluredir=allure-results -s - все сайты с аллюр
-    pytest test_universal2.py --site=mts-home-gpon.ru --alluredir=allure-results -s - конкретный сайт с аллюр
-    pytest test_universal2.py --provider=mts -s - только сайты провайдера
-    pytest test_universal2.py --service-mode=core -s - базовый submit без полного перебора Place
-    pytest test_universal2.py --service-mode=variants -s - отдельный прогон только Place-вариантов
-
-Добавить новый сайт — добавить запись в config/providers/<provider>.py.
+The scope is fixed in this module and URL cases are loaded only from
+urls/brand_scopes/rtk.txt.
 """
 
 import pytest
@@ -863,165 +852,6 @@ def popup_wait_timeout_ms(page: Page | None) -> int:
 
 def popup_click_settle_ms(page: Page | None) -> int:
     return browser_timeout(page, 500, FIREFOX_POPUP_CLICK_SETTLE_MS)
-
-
-# ---------------------------------------------------------------------------
-# pytest: параметризация сайтов
-# ---------------------------------------------------------------------------
-
-def pytest_generate_tests(metafunc):
-    """Параметризует фикстуру site_cfg — один прогон на каждый сайт."""
-    if "site_cfg" in metafunc.fixturenames:
-        run_mode = str(metafunc.config.getoption("--run-mode", default="brand-oriented") or "brand-oriented").strip().lower()
-        if run_mode != "brand-oriented":
-            raise pytest.UsageError("В Big_land_test_2 поддерживается только brand-oriented режим.")
-        primary_form_arg = metafunc.config.getoption("--primary-form", default=None)
-        brand_scope_arg = metafunc.config.getoption("--brand-scope", default=None)
-        url_brand_arg = metafunc.config.getoption("--url-brand", default=None)
-        form_suite_arg = metafunc.config.getoption("--form-suite", default="all")
-        provider_arg = metafunc.config.getoption("--provider", default=None)
-        site_arg = metafunc.config.getoption("--site", default=None)
-        url_shard_index = int(metafunc.config.getoption("--url-shard-index", default=1) or 1)
-        url_shard_total = int(metafunc.config.getoption("--url-shard-total", default=1) or 1)
-        service_mode = normalize_service_mode(
-            metafunc.config.getoption("--service-mode", default=SERVICE_MODE_ALL)
-        )
-        url_brand = (url_brand_arg or "").strip().lower()
-        form_suite = (form_suite_arg or "all").strip().lower()
-        primary_form = (primary_form_arg or "").strip().lower()
-        brand_scope = (brand_scope_arg or "").strip().lower()
-
-        if run_mode == "form-oriented":
-            if not primary_form:
-                raise pytest.UsageError(
-                    "--primary-form обязателен в --run-mode=form-oriented."
-                )
-            if url_brand or provider_arg or site_arg:
-                raise pytest.UsageError(
-                    "form-oriented режим использует общий URL-скоуп и не принимает "
-                    "--url-brand/--provider/--site."
-                )
-            if form_suite != "all":
-                raise pytest.UsageError(
-                    "В form-oriented режиме используйте --primary-form, а --form-suite оставьте all."
-                )
-            try:
-                selected_items = list(
-                    build_site_configs_from_all_urls(
-                        primary_form=primary_form,
-                        url_shard_index=url_shard_index,
-                        url_shard_total=url_shard_total,
-                    ).items()
-                )
-            except ValueError as exc:
-                raise pytest.UsageError(str(exc)) from exc
-        elif run_mode == "brand-oriented":
-            if not brand_scope:
-                raise pytest.UsageError(
-                    "--brand-scope обязателен в --run-mode=brand-oriented."
-                )
-            if primary_form or url_brand or provider_arg or site_arg:
-                raise pytest.UsageError(
-                    "brand-oriented режим использует только --brand-scope."
-                )
-            if form_suite != "all":
-                raise pytest.UsageError(
-                    "В brand-oriented режиме --form-suite должен быть all."
-                )
-            try:
-                selected_items = list(
-                    build_site_configs_from_brand_scope(
-                        scope=brand_scope,
-                        url_shard_index=url_shard_index,
-                        url_shard_total=url_shard_total,
-                    ).items()
-                )
-            except ValueError as exc:
-                raise pytest.UsageError(str(exc)) from exc
-        elif primary_form:
-            raise pytest.UsageError(
-                "--primary-form поддерживается только вместе с --run-mode=form-oriented."
-            )
-
-        if run_mode == "legacy" and url_brand and (provider_arg or site_arg):
-            raise pytest.UsageError(
-                "--url-brand нельзя комбинировать с --provider/--site. "
-                "Используйте либо URL-режим, либо provider-режим."
-            )
-        if not url_brand and form_suite != "all":
-            raise pytest.UsageError(
-                "--form-suite поддерживается только вместе с --url-brand."
-            )
-        if url_shard_total < 1 or url_shard_index < 1 or url_shard_index > url_shard_total:
-            raise pytest.UsageError(
-                "--url-shard-index/--url-shard-total должны быть >=1, "
-                "а index не должен превышать total."
-            )
-        if not url_brand and (url_shard_index != 1 or url_shard_total != 1):
-            raise pytest.UsageError(
-                "--url-shard-index/--url-shard-total поддерживаются только вместе с --url-brand."
-            )
-
-        try:
-            if run_mode in {"form-oriented", "brand-oriented"}:
-                pass
-            elif url_brand:
-                if url_brand not in available_url_brands():
-                    raise ValueError(
-                        f"--url-brand={url_brand!r} не найден. "
-                        f"Доступно: {', '.join(available_url_brands())}"
-                    )
-                selected_items = list(
-                    build_site_configs_from_urls(
-                        brand=url_brand,
-                        form_suite=form_suite,
-                        url_shard_index=url_shard_index,
-                        url_shard_total=url_shard_total,
-                    ).items()
-                )
-            else:
-                selected_items = list(
-                    select_site_configs(provider=provider_arg, site=site_arg).items()
-                )
-        except ValueError as exc:
-            message = str(exc)
-            # В URL-режиме при form-suite + shard часть шардов может быть пустой.
-            # Это штатно (например moving только на ограниченном наборе URL),
-            # поэтому пропускаем suite вместо падения всей CI-джобы.
-            if url_brand and "не найдено URL" in message:
-                print(f"[URL-MODE] ⚠️ {message} -> suite будет пропущен")
-                selected_items = []
-            else:
-                raise pytest.UsageError(message) from exc
-
-        configs = []
-        ids = []
-        for site_id, cfg in selected_items:
-            cfg_copy = dict(cfg)
-            cfg_copy["_service_mode"] = service_mode
-            cfg_copy["_run_mode"] = run_mode
-            if run_mode == "form-oriented":
-                cfg_copy["_primary_form"] = primary_form
-            if run_mode == "brand-oriented":
-                cfg_copy["_brand_scope"] = brand_scope
-            configs.append(cfg_copy)
-            id_parts: list[str] = [site_id]
-            if service_mode != SERVICE_MODE_ALL:
-                id_parts.append(service_mode)
-            if url_brand and form_suite != "all":
-                id_parts.append(f"form:{form_suite}")
-            if run_mode == "form-oriented":
-                id_parts.append(f"primary:{primary_form}")
-            if run_mode == "brand-oriented":
-                id_parts.append(f"scope:{brand_scope}")
-            ids.append(id_parts[0] + "".join(f"[{part}]" for part in id_parts[1:]))
-
-        metafunc.parametrize("site_cfg", configs, ids=ids)
-
-
-@pytest.fixture
-def site_cfg(request):
-    return request.param
 
 
 # ---------------------------------------------------------------------------
@@ -4741,44 +4571,53 @@ def run_site_scenario(page: Page, cfg: dict):
 
 
 # ---------------------------------------------------------------------------
-# Тест
-# ---------------------------------------------------------------------------
 
-def test_site(
+# Independent Beeline scenario entrypoint.
+
+SCOPE = "rtk"
+
+
+def pytest_generate_tests(metafunc):
+    if "scenario_cfg" not in metafunc.fixturenames:
+        return
+    requested_scope = str(
+        metafunc.config.getoption("--brand-scope", default="") or ""
+    ).strip().lower()
+    if requested_scope != SCOPE:
+        raise pytest.UsageError(
+            f"Сценарий {SCOPE!r} запущен с несовместимым --brand-scope={requested_scope!r}."
+        )
+    configs = build_site_configs_from_brand_scope(scope=SCOPE)
+    values = list(configs.values())
+    metafunc.parametrize(
+        "scenario_cfg",
+        values,
+        ids=[f"{SCOPE}:{cfg['base_url']}" for cfg in values],
+    )
+
+
+def test_rtk(
     page: Page,
-    site_cfg: dict,
+    scenario_cfg: dict,
     browser_name: str,
     blocking_profile: str,
     execution_profile: str,
 ):
-    """
-    Запуск для одного сайта:
-        pytest -s --headed --site=mts-home-gpon.ru
-
-    Запуск для всех сайтов:
-        pytest -s --headed
-    """
-    service_mode = normalize_service_mode(site_cfg.get("_service_mode", SERVICE_MODE_ALL))
-    allure.dynamic.title(
-        f"Сайт: {site_cfg['base_url']} [{service_mode}] [{browser_name}] [{blocking_profile}]"
-    )
-    allure.dynamic.label("suite", "Формы провайдеров")
-    allure.dynamic.label("subSuite", f"service-mode: {service_mode}")
-    brand_scope = str(site_cfg.get("_brand_scope") or "").strip()
-    if brand_scope:
-        allure.dynamic.label("runMode", "brand-oriented")
-        allure.dynamic.label("brandScope", brand_scope)
-        allure.dynamic.parameter("brand_scope", brand_scope)
-        allure.dynamic.parameter(
-            "domain_session",
-            "true" if site_cfg.get("_domain_session") else "false",
-        )
-    requested_form_suite = str(site_cfg.get("_requested_form_suite") or "all").strip().lower()
-    if requested_form_suite != "all":
-        allure.dynamic.label("parentSuite", f"form-suite: {requested_form_suite}")
-        allure.dynamic.parameter("form_suite", requested_form_suite)
+    cfg = scenario_cfg
+    url = cfg["base_url"]
+    allure.dynamic.title(f"{SCOPE}: {url}")
+    allure.dynamic.label("suite", "Brand-specific provider scenarios")
+    allure.dynamic.label("runMode", "brand-oriented")
+    allure.dynamic.label("brandScope", SCOPE)
+    allure.dynamic.label("scenarioType", "brand")
+    allure.dynamic.parameter("brand_scope", SCOPE)
+    allure.dynamic.parameter("url", url)
     allure.dynamic.parameter("browser", browser_name)
     allure.dynamic.parameter("blocking_profile", blocking_profile)
     allure.dynamic.parameter("execution_profile", execution_profile)
-    run_site_scenario(page, site_cfg)
+    allure.dynamic.parameter(
+        "domain_session",
+        "true" if cfg.get("_domain_session") else "false",
+    )
+    run_site_scenario(page, cfg)
 

@@ -24,6 +24,23 @@ mts_home_online_ab  -> mts-home-online.ru
 
 Каждый AB-сценарий запускается отдельной Jenkins job и не пересекается с другими лендингами.
 
+Исполнительные entrypoint-файлы находятся в `scenarios/`:
+
+```text
+scenarios/beeline.py
+scenarios/mega.py
+scenarios/mts.py
+scenarios/providerdom.py
+scenarios/rtk.py
+scenarios/t2.py
+scenarios/mts_gpon_ab.py
+scenarios/mts_home_online_ab.py
+```
+
+Большой `big_landing_code.py` удалён из новой модели. Каждый scope запускается
+через собственный entrypoint в `scenarios/`; Jenkins больше не имеет fallback
+на общий файл.
+
 ## URL-сборка
 
 Новые сокращённые scope-файлы находятся в `urls/brand_scopes/`.

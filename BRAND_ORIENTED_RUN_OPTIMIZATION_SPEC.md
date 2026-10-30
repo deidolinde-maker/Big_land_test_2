@@ -36,6 +36,10 @@ error_detail
 
 Основные jobs: Beeline, Mega, MTS, Providerdom, Ростелеком и T2.
 
+Каждая job запускает собственный Python entrypoint из `scenarios/`. Общие
+Playwright-примитивы и текущая форма-логика пока импортируются из core-модуля,
+но scope и точка исполнения бренда отделены.
+
 Отдельные AB jobs:
 
 - `MTS GPON AB` — только `mts-home-gpon.ru`;

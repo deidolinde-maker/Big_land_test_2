@@ -1,4 +1,4 @@
-# Big_landing_test
+# Big_land_test_2
 
 Автотесты заявочных форм и попапов на лендингах провайдеров с запуском в Jenkins и отчетами Allure.
 
@@ -13,19 +13,21 @@
 
 Если подтверждения нет, тест считает кейс ошибкой.
 
-## Основные компоненты
+## Основные компоненты новой модели
 
-- `big_landing_code.py` - основной тестовый сценарий и шаговые проверки.
+- `scenarios/<scope>.py` - самостоятельный исполняемый сценарий конкретного бренда или MTS AB.
+- `urls/brand_scopes/*.txt` - фиксированные URL каждого scope.
+- `Jenkinsfile.<scope>` - отдельная job для каждого scope.
 - `conftest.py` - CLI-параметры pytest, execution profiles, видео/скриншоты.
-- `config/url_loader.py` - сбор runtime-конфигов из `urls/<brand>.txt`.
-- `config/form_allowlists/*.txt` - allowlist URL по типам форм.
-- `config/form_expectations.py` и `config/form_expectations/*.json` - ожидаемые и optional формы, override-правила.
+- `config/url_loader.py` и `config/brand_scope.py` - сбор конфигурации только выбранного scope.
+- `notification_transport.py` - независимая отправка Telegram через proxy endpoint или Bot API.
 - `notify_from_allure.py` - формирование summary из `allure-results` для Telegram.
-- `Jenkinsfile` - полный CI-пайплайн (matrix, chain, purge, alerts, Allure).
+- `jenkins/brand_pipeline.groovy` - общий технический pipeline без брендовой логики.
 
 ## Логика сценария
 
-Ключевой поток в `run_site_scenario(...)`:
+Каждый `scenarios/<scope>.py` параметризует один тест-кейс на один URL своего scope.
+Порядок проверки:
 
 1. Шаг 1: `checkaddress` (если ожидается для URL).
 2. Шаг 2: попапы главной страницы.
@@ -42,15 +44,18 @@
 - если подтверждения нет, кейс падает;
 - техалерты/шаговые алерты не меняют итоговый критерий успеха.
 
-## URL-режим и form-suite
+## Активный запуск
 
-Запуск в боевом пайплайне идет в URL-режиме:
+Пример локального запуска одного scope:
 
-- `--url-brand <brand>` загружает URL из `urls/<brand>.txt`;
-- `--form-suite <suite>` фильтрует URL по allowlist suite;
-- `--url-shard-index` и `--url-shard-total` делят URL на шарды.
+```text
+pytest scenarios/beeline.py --run-mode=brand-oriented --brand-scope=beeline --alluredir=allure-results
+```
 
-Поддерживаемые suite:
+Активная модель не использует `PRIMARY_FORM`, `--url-brand`, `--form-suite`,
+`--provider`, `--site` и старый общий Jenkinsfile.
+
+Исторические form-suite материалы ниже сохранены только для справки.
 
 - `profit`
 - `connection`

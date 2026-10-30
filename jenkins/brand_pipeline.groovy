@@ -2,9 +2,7 @@ def runBrand(String fixedScope) {
   node {
     timestamps {
       def testFailure = null
-      def testFile = fixedScope in ['mts_gpon_ab', 'mts_home_online_ab']
-        ? 'mts_ab_tests/test_mts_ab.py'
-        : 'big_landing_code.py'
+      def testFile = "scenarios/${fixedScope}.py"
 
       withCredentials([
         string(credentialsId: 'browser_proxy_creds', variable: 'BROWSER_PROXY'),
@@ -71,7 +69,7 @@ def runBrand(String fixedScope) {
                 if [ -s telegram_alert_message.txt ] && [ "$(cat telegram_alert_should_send.txt 2>/dev/null | tr -d '[:space:]')" = "1" ]; then
                   .venv/bin/python - <<'PY'
 from pathlib import Path
-from big_landing_code import send_telegram_alert
+from notification_transport import send_telegram_alert
 text = Path("telegram_alert_message.txt").read_text(encoding="utf-8").strip()
 if text:
     send_telegram_alert(text, alert_type="step")
@@ -80,7 +78,7 @@ PY
                 if [ -s telegram_message.txt ] && [ "$(cat telegram_should_send.txt 2>/dev/null | tr -d '[:space:]')" = "1" ]; then
                   .venv/bin/python - <<'PY'
 from pathlib import Path
-from big_landing_code import send_telegram_alert
+from notification_transport import send_telegram_alert
 text = Path("telegram_message.txt").read_text(encoding="utf-8").strip()
 if text:
     send_telegram_alert(text, alert_type="summary")

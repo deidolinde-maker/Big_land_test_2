@@ -4,7 +4,6 @@ from pathlib import Path
 import pytest
 import allure
 from config.brand_scope import available_brand_scopes, is_ab_scope
-from config.form_expectations import available_form_suites
 
 ADBLOCK_MVP_BLOCKLIST = (
     "doubleclick.net",
@@ -42,69 +41,11 @@ def pytest_addoption(parser):
         help="Единственная модель запуска: brand-oriented.",
     )
     parser.addoption(
-        "--primary-form",
-        action="store",
-        default=None,
-        choices=("profit", "connection", "connection_cards", "checkaddress", "undecided", "moving", "express"),
-        help="Основная форма для form-oriented режима.",
-    )
-    parser.addoption(
         "--brand-scope",
         action="store",
         default=None,
         choices=available_brand_scopes(),
         help="Сокращённый brand/AB scope для brand-oriented режима.",
-    )
-    parser.addoption(
-        "--url-brand",
-        action="store",
-        default=None,
-        help=(
-            "Бренд для запуска по внешнему списку URL из urls/<brand>.txt "
-            "(например: mts, beeline, megafon, t2, rostelecom, domru, ttk)."
-        ),
-    )
-    parser.addoption(
-        "--form-suite",
-        action="store",
-        default="all",
-        choices=available_form_suites(),
-        help=(
-            "Форма для прогона в URL-режиме: all, profit, connection, "
-            "connection_cards, checkaddress, business, undecided, moving, express."
-        ),
-    )
-    parser.addoption(
-        "--url-shard-index",
-        action="store",
-        type=int,
-        default=1,
-        help=(
-            "Номер шарда URL (начиная с 1) для --url-brand. "
-            "Используется вместе с --url-shard-total."
-        ),
-    )
-    parser.addoption(
-        "--url-shard-total",
-        action="store",
-        type=int,
-        default=1,
-        help=(
-            "Общее число шардов URL для --url-brand. "
-            "При значении >1 список URL делится на части."
-        ),
-    )
-    parser.addoption(
-        "--provider",
-        action="store",
-        default=None,
-        help="Имя провайдера из config/providers (например: mts, beeline, megafon, t2).",
-    )
-    parser.addoption(
-        "--site",
-        action="store",
-        default=None,
-        help="Домен сайта (site_id), например: mts-home-gpon.ru",
     )
     parser.addoption(
         "--service-mode",
