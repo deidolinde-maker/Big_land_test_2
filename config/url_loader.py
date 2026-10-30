@@ -31,6 +31,41 @@ URL_FILE_BY_BRAND: dict[str, str] = {
 }
 
 
+def _root_host(url: str) -> str:
+    host = (urlsplit(url).hostname or "").lower().strip(".")
+    parts = host.split(".")
+    return ".".join(parts[-2:]) if len(parts) >= 2 else host
+
+
+def _apply_scope_form_baselines(configs: dict[str, dict]) -> None:
+    """Use the root URL's base forms for regional and newly added pages."""
+    baseline_by_root: dict[str, set[str]] = {}
+    for cfg in configs.values():
+        url = canonicalize_url(cfg["base_url"])
+        parsed = urlsplit(url)
+        if parsed.path not in {"", "/"}:
+            continue
+        host = (parsed.hostname or "").lower()
+        if host != _root_host(url):
+            continue
+        baseline_by_root[_root_host(url)] = {
+            form for form in (cfg.get("_expected_form_types") or []) if form != "business"
+        }
+
+    for cfg in configs.values():
+        root = _root_host(cfg["base_url"])
+        baseline = baseline_by_root.get(root)
+        if baseline is not None:
+            cfg["_expected_form_types"] = sorted(baseline)
+        else:
+            cfg["_expected_form_types"] = sorted(
+                form for form in (cfg.get("_expected_form_types") or []) if form != "business"
+            )
+        cfg["_optional_expected_form_types"] = sorted(
+            form for form in (cfg.get("_optional_expected_form_types") or []) if form != "business"
+        )
+
+
 def available_url_brands() -> list[str]:
     return sorted(URL_FILE_BY_BRAND.keys())
 
@@ -201,6 +236,7 @@ def build_site_configs_from_brand_scope(
         cfg["_brand_scope_provider"] = provider
         cfg["_domain_session"] = scope_key in {"mts_gpon_ab", "mts_home_online_ab"}
         cfg["_mts_ab_scenario"] = cfg["_domain_session"]
+    _apply_scope_form_baselines(configs)
     return configs
 
 

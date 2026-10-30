@@ -76,10 +76,6 @@ SOFT_HOUSE_RETRY_VALUES_BY_URL = {
     "https://shcherbinka.mts-home.online/address/ul-rabocaja-id104433": ("2", "7", "1"),
     "https://shcherbinka.mts-home.online/address/ul-rabochaya-d-2-id203432": ("2", "7", "1"),
 }
-CONNECTION_TRIGGER_BUSINESS_FORM_URLS = {
-    "https://mts-home.online/business",
-    "https://moskva.mts-home.online/business",
-}
 HOUSE_SUGGEST_EXTENDED_TIMEOUT_URLS = {
     "https://mts-internet.online/sankt-peterburg",
     "https://mts-internet.online/sankt-peterburg/jk-ogni-zaliva",
@@ -185,38 +181,6 @@ def _street_value_for_url(page: Page) -> str:
         if current_url.startswith(prefix):
             return value
     return "Ленина"
-
-
-def _resolve_expected_form_alias(
-    *,
-    base_url: str,
-    expected_form_types: set[str] | None,
-    detected_form_type: str,
-    form_hint: str | None,
-) -> str | None:
-    """
-    URL-specific compatibility:
-    on selected /business pages connection trigger can open business form.
-    Treat that popup as satisfying "connection" expectation.
-    """
-    if (
-        expected_form_types
-        and "connection" in expected_form_types
-        and detected_form_type == "business"
-        and (form_hint in {None, "", "connection"})
-        and _normalize_runtime_url(base_url) in CONNECTION_TRIGGER_BUSINESS_FORM_URLS
-    ):
-        return "connection"
-    return None
-
-
-def _is_connection_business_like_context(page: Page | None, form_type: str) -> bool:
-    if page is None:
-        return False
-    if form_type != "connection":
-        return False
-    current_url = _normalize_runtime_url(page.url or "")
-    return current_url in CONNECTION_TRIGGER_BUSINESS_FORM_URLS
 
 
 def _now_msk_str() -> str:
@@ -469,93 +433,6 @@ def goto_or_handle_step(
 
 
 
-def _is_business_target_url(current_url: str, business_url: str) -> bool:
-    target_host = (urlsplit(business_url).netloc or "").lower()
-    target_path = (urlsplit(business_url).path or "").rstrip("/").lower()
-
-    cur_host = (urlsplit(current_url).netloc or "").lower()
-    cur_path = (urlsplit(current_url).path or "").rstrip("/").lower()
-
-    if target_host and cur_host and cur_host != target_host:
-        return False
-    if not target_path:
-        return False
-    return cur_path == target_path or cur_path.startswith(target_path + "/")
-
-
-def try_open_business_via_navigation(page: "Page", business_url: str) -> tuple[bool, str]:
-    if _is_business_target_url(page.url, business_url):
-        return True, "already_on_business"
-
-    checked = 0
-    for sel in BUSINESS_NAV_SELECTORS:
-        try:
-            loc = page.locator(sel)
-            total = loc.count()
-        except Exception:
-            continue
-
-        for idx in range(min(total, 8)):
-            checked += 1
-            cand = loc.nth(idx)
-            try:
-                if not cand.is_visible():
-                    continue
-            except Exception:
-                continue
-
-            try:
-                href = (cand.get_attribute("href") or "").strip().lower()
-            except Exception:
-                href = ""
-
-            if href.startswith("mailto:") or href.startswith("tel:"):
-                continue
-
-            before_url = page.url
-            try:
-                cand.scroll_into_view_if_needed()
-                cand.click(timeout=BUSINESS_NAV_CLICK_TIMEOUT_MS, force=True)
-            except Exception:
-                continue
-
-            page.wait_for_timeout(500)
-            try:
-                page.wait_for_load_state("domcontentloaded", timeout=BUSINESS_NAV_WAIT_TIMEOUT_MS)
-            except Exception:
-                pass
-
-            if _is_business_target_url(page.url, business_url):
-                return True, f"selector={sel} idx={idx}"
-
-            if page.url != before_url and _is_business_target_url(page.url, business_url):
-                return True, f"selector={sel} idx={idx} delayed_url"
-
-    if checked == 0:
-        return False, "business nav candidates not found"
-    return False, "business nav click did not lead to target"
-
-
-def goto_business_or_handle_step(
-    page: "Page",
-    start_url: str,
-    business_url: str,
-    site_label: str,
-    step_no: str,
-    step_name: str,
-):
-    goto_or_handle_step(page, start_url, site_label, step_no, step_name)
-    close_overlays(page)
-
-    nav_ok, nav_reason = try_open_business_via_navigation(page, business_url)
-    if nav_ok:
-        print(f"  [BUSINESS-NAV] success via landing nav ({nav_reason})")
-        return
-
-    print(f"  [BUSINESS-NAV] fallback goto -> {business_url} ({nav_reason})")
-    goto_or_handle_step(page, business_url, site_label, step_no, step_name)
-
-
 def log_error(error_code: str, page: "Page", site_label: str, extra: str = ""):
     """
     Печатает ошибку в консоль и мгновенно шлёт Telegram-алерт.
@@ -626,14 +503,6 @@ FORM_CONFIGS = {
         "no_house":   False,
         "no_suggest": False,
     },
-    "business": {
-        "street":     ".business_no_address_full_address, [name='City'], [name='city'], #city, [name='Address'], [name='address'], input[placeholder='Адрес']",
-        "house":      None,
-        "phone":      ".business_no_address_phone, [name='Phone']",
-        "submit":     ".business_no_address_button_send",
-        "no_house":   True,
-        "no_suggest": True,
-    },
     "undecided": {
         "street":     ".undecided_address_street, .checkaddress_address_street",
         "house":      ".undecided_address_house, .checkaddress_address_house",
@@ -661,7 +530,6 @@ POPUP_BUTTON_CLASSES = {
     "moving":             ".moving_address_button",
     "profit":             ".button-lead-catcher.profit_address_button, button.profit_address_button, a.profit_address_button, .profit_address_button",
     "express-connection": ".express-connection_address_button",
-    "business":           ".business_no_address_button",
 }
 
 # Конфиги сайтов подаются через provider-loader (config/providers + config/loader.py).
@@ -730,7 +598,6 @@ SUGGESTION_SELECTORS = [
 SERVICE_PLACE_VALUES = [
     "В квартиру",
     "В частный дом",
-    "Для бизнеса",
 ]
 
 REGION_POPUP_DETECT_SELECTORS = [
@@ -807,10 +674,6 @@ SERVICE_MODE_ALL = "all"
 SERVICE_MODE_CORE = "core"
 SERVICE_MODE_VARIANTS = "variants"
 SERVICE_MODE_CHOICES = {SERVICE_MODE_ALL, SERVICE_MODE_CORE, SERVICE_MODE_VARIANTS}
-# Temporary switch: keep business submission code available, but do not execute it.
-ENABLE_BUSINESS_SUBMIT_STEPS = False
-
-
 def get_execution_profile_name() -> str:
     return (os.getenv("PYTEST_EXECUTION_PROFILE") or "desktop").strip().lower()
 
@@ -1654,7 +1517,7 @@ def resolve_service_values_for_mode(
     mode = normalize_service_mode(service_mode)
 
     if mode == SERVICE_MODE_VARIANTS:
-        if form_type in ("profit", "business"):
+        if form_type == "profit":
             print("  [FORM] VARIANTS: тип формы без Place — пропускаем")
             return []
         if detected_service_values:
@@ -1663,7 +1526,7 @@ def resolve_service_values_for_mode(
         print("  [FORM] VARIANTS: Place не найден — пропускаем")
         return []
 
-    if form_type in ("profit", "business"):
+    if form_type == "profit":
         return [None]
 
     if not detected_service_values:
@@ -1936,13 +1799,6 @@ def fill_form(page: Page, container, form_type: str,
     no_house   = cfg.get("no_house", False)
     no_suggest = cfg.get("no_suggest", False)
     street_local = container.locator(cfg["street"]).first
-    if _is_connection_business_like_context(page, form_type):
-        # On specific /business URLs connection trigger opens business-like form
-        # without house/suggest logic.
-        no_house = True
-        no_suggest = True
-        print("  [FORM] Connection business-like mode: house/suggest steps are skipped")
-
     if service_place_value:
         if not select_service_place_value(container, service_place_value):
             return False
@@ -2266,27 +2122,6 @@ def fill_form(page: Page, container, form_type: str,
 def find_submit(container, form_type: str):
     cfg    = FORM_CONFIGS[form_type]
     submit_selectors = [cfg["submit"]]
-
-    # On selected /business URLs the connection trigger can open a business-like
-    # form that uses business submit selector.
-    if form_type == "connection":
-        page_ctx = None
-        try:
-            page_ctx = container.page
-        except Exception:
-            page_ctx = None
-        use_business_fallback = _is_connection_business_like_context(page_ctx, form_type)
-    else:
-        use_business_fallback = False
-
-    if use_business_fallback:
-        submit_selectors.extend(
-            [
-                ".business_no_address_button_send",
-                "input.wpcf7-submit",
-                "button[type='submit'], input[type='submit']",
-            ]
-        )
 
     for submit_selector in submit_selectors:
         submit = container.locator(submit_selector).first
@@ -2630,38 +2465,6 @@ def collect_popup_buttons(
     print(f"[COLLECT] Итого: {len(result)}\n")
     return result
 
-
-def collect_business_buttons(page: Page) -> list:
-    btns   = page.locator(POPUP_BUTTON_CLASSES["business"])
-    total  = btns.count()
-    result = []
-    print(f"\n[BUSINESS COLLECT] Элементов: {total}")
-    for i in range(total):
-        btn = btns.nth(i)
-        try:
-            if not btn.is_visible() or not btn.is_enabled():
-                continue
-            text = (btn.inner_text() or "").strip().lower()
-            tag  = btn.evaluate("el => el.tagName.toLowerCase()")
-            result.append(
-                {
-                    "nth": i,
-                    "text": text,
-                    "tag": tag,
-                    "form_hint": "business",
-                    "trigger_kind": "business_button",
-                }
-            )
-            print(f"  [BUSINESS COLLECT] #{len(result)} nth={i} <{tag}> '{text}'")
-        except Exception:
-            pass
-    print(f"[BUSINESS COLLECT] Итого: {len(result)}\n")
-    return result
-
-
-# ---------------------------------------------------------------------------
-# Универсальный цикл попапов
-# ---------------------------------------------------------------------------
 
 def dismiss_profit_popup(page: Page):
     """
@@ -3349,32 +3152,6 @@ def process_all_popups(page: Page, base_url: str,
     tested_types |= pretested_form_types
     tested_trigger_kinds |= pretested_trigger_kinds
     return total_success, total_failed, total_first_fail, tested_types, tested_trigger_kinds
-
-
-def process_business_popups(page: Page, base_url: str,
-                             has_name_field: bool = False,
-                             service_mode: str = SERVICE_MODE_ALL,
-                             expected_form_types: set[str] | None = None) -> tuple[int, int, str | None, set[str]]:
-    if normalize_service_mode(service_mode) == SERVICE_MODE_VARIANTS:
-        print("[BUSINESS] VARIANTS-режим: шаг /business пропущен")
-        return 0, 0, None, set()
-
-    buttons = collect_business_buttons(page)
-    if not buttons:
-        print("[BUSINESS] Кнопки не найдены — пропускаем")
-        return 0, 0, None, set()
-
-    def locate(page, entry):
-        return page.locator(POPUP_BUTTON_CLASSES["business"]).nth(entry["nth"])
-
-    success, failed, first_fail, tested_types, _tested_trigger_kinds = _run_popup_cycle(
-        page, buttons, base_url, locate, label="BUSINESS",
-        has_name_field=has_name_field, service_mode=service_mode,
-        allow_root_return_after_thanks=True,
-        expected_form_types=expected_form_types,
-        stop_after_first_expected_form=bool(expected_form_types) and len(expected_form_types) == 1,
-    )
-    return success, failed, first_fail, tested_types
 
 
 def process_inline_connection_form(
@@ -4327,225 +4104,6 @@ def run_site_scenario(page: Page, cfg: dict):
                     send_step_alert(site_label, "2", "попапы главной", reason[:900], page)
             assert f == 0, (
                 f"[{site_label}] Попапы главной: {f} ошибок, {s} успешно"
-                + (f" | first={first_fail}" if first_fail else "")
-            )
-
-    # ── 3. Попапы /business ───────────────────────────────────────────────
-    with allure.step("Шаг 3: попапы /business"):
-        if not ENABLE_BUSINESS_SUBMIT_STEPS:
-            mark_step_not_applicable(
-                site_label,
-                "3",
-                "попапы /business",
-                "временно отключен",
-            )
-        elif service_mode == SERVICE_MODE_VARIANTS:
-            mark_step_not_applicable(site_label, "3", "попапы /business", "service_mode=variants")
-        elif ("business" in expected_forms) if is_url_mode else cfg.get("has_business"):
-            business_url = base_url
-            print(f"\n{sep}\n[{site_label}] Шаг 3: попапы /business\n{sep}")
-            if is_url_mode:
-                goto_or_handle_step(page, business_url, site_label, "3", "попапы /business")
-                close_overlays(page)
-            else:
-                business_url = base_url.rstrip("/") + "/business"
-                goto_business_or_handle_step(
-                    page,
-                    base_url,
-                    business_url,
-                    site_label,
-                    "3",
-                    "\u043f\u043e\u043f\u0430\u043f\u044b /business",
-                )
-                # close_overlays is already handled inside goto_business_or_handle_step
-            suppress_tech_alerts_for_business = (
-                is_url_mode
-                and expected_business_forms == {"business"}
-            )
-            previous_suppress_tech_alerts = SUPPRESS_TECH_ALERTS
-            if suppress_tech_alerts_for_business:
-                SUPPRESS_TECH_ALERTS = True
-            try:
-                s, f, first_fail, tested_business_forms = process_business_popups(
-                    page,
-                    business_url,
-                    has_name_field=has_name_field,
-                    service_mode=service_mode,
-                    expected_form_types=expected_business_forms if is_url_mode else None,
-                )
-            except SiteUnavailableError as e:
-                skip_site_due_unavailability(site_label, "3", "попапы /business", str(e), page)
-            finally:
-                SUPPRESS_TECH_ALERTS = previous_suppress_tech_alerts
-            if is_url_mode:
-                missing_business = expected_business_forms - tested_business_forms
-                if missing_business:
-                    f += len(missing_business)
-                    missing_text = ", ".join(sorted(missing_business))
-                    detail = f"не найдены ожидаемые business-формы: {missing_text}"
-                    if first_fail is None:
-                        first_fail = detail[:220]
-                    print(f"  [BUSINESS] ❌ {detail}")
-            allow_business_partial_success = (
-                is_url_mode
-                and expected_business_forms == {"business"}
-                and s > 0
-            )
-            if allow_business_partial_success and f > 0:
-                print(
-                    f"  [BUSINESS] ⚠️ Есть частичные ошибки ({f}), "
-                    f"но минимум один успешный submit найден ({s}) — шаг засчитан"
-                )
-                f = 0
-                first_fail = None
-            total_success_submits += s
-            if f > 0:
-                reason = f"{f} ошибок, {s} успешно"
-                if first_fail:
-                    reason += f" | first={first_fail}"
-                if total_success_submits > 0:
-                    print(
-                        "  [STEP-ALERT] ℹ️ suppressed alert for step 3: "
-                        f"по URL найден успешный submit ({total_success_submits})"
-                    )
-                    f = 0
-                    first_fail = None
-                else:
-                    send_step_alert(site_label, "3", "попапы /business", reason[:900], page)
-            assert f == 0, (
-                f"[{site_label}] Бизнес: {f} ошибок, {s} успешно"
-                + (f" | first={first_fail}" if first_fail else "")
-            )
-        else:
-            reason = (
-                "не входит в expected forms текущего URL"
-                if is_url_mode
-                else "has_business=False"
-            )
-            mark_step_not_applicable(site_label, "3", "попапы /business", reason)
-
-    # ── 4. Сценарий города ────────────────────────────────────────────────
-    with allure.step("Шаг 4: выбор города"):
-        if is_url_mode:
-            mark_step_not_applicable(
-                site_label,
-                "4",
-                "выбор города",
-                "url_mode: смена региона в хедере отключена",
-            )
-        elif city_name:
-            print(f"\n{sep}\n[{site_label}] Шаг 4: город '{city_name}'\n{sep}")
-            try:
-                city_base, city_biz = run_city_scenario(page, base_url, city_name)
-            except SiteUnavailableError as e:
-                skip_site_due_unavailability(site_label, "4", "выбор города", str(e), page)
-            if city_base is None:
-                reason = f"город '{city_name}' не выбран или не произошёл редирект"
-                if total_success_submits > 0:
-                    print(
-                        "  [STEP-ALERT] ℹ️ suppressed alert for step 4: "
-                        f"по URL найден успешный submit ({total_success_submits})"
-                    )
-                else:
-                    send_step_alert(site_label, "4", "выбор города", reason, page)
-                    assert city_base is not None, f"[{site_label}] Шаг 4: {reason}"
-        else:
-            mark_step_not_applicable(site_label, "4", "выбор города", "city_name=None")
-
-    # ── 4a. Попапы главной города ─────────────────────────────────────────
-    with allure.step("Шаг 4a: попапы главной города"):
-        if is_url_mode:
-            mark_step_not_applicable(
-                site_label,
-                "4a",
-                "попапы главной города",
-                "url_mode: шаг отключен в первой итерации",
-            )
-        elif city_name is None:
-            mark_step_not_applicable(site_label, "4a", "попапы главной города", "city_name=None")
-        elif city_base is None:
-            mark_step_not_applicable(site_label, "4a", "попапы главной города", "городской сценарий недоступен по условию")
-        else:
-            goto_or_handle_step(page, city_base, site_label, "4a", "попапы главной города")
-            close_overlays(page)
-            try:
-                s, f, first_fail, _, _ = process_all_popups(
-                    page,
-                    city_base,
-                    has_name_field=has_name_field,
-                    service_mode=service_mode,
-                    allow_root_return_after_thanks=True,
-                )
-            except SiteUnavailableError as e:
-                skip_site_due_unavailability(site_label, "4a", "попапы главной города", str(e), page)
-            total_success_submits += s
-            if f > 0:
-                reason = f"{f} ошибок, {s} успешно"
-                if first_fail:
-                    reason += f" | first={first_fail}"
-                if total_success_submits > 0:
-                    print(
-                        "  [STEP-ALERT] ℹ️ suppressed alert for step 4a: "
-                        f"по URL найден успешный submit ({total_success_submits})"
-                    )
-                    f = 0
-                    first_fail = None
-                else:
-                    send_step_alert(site_label, "4a", "попапы главной города", reason[:900], page)
-            assert f == 0, (
-                f"[{site_label}] Попапы города: {f} ошибок"
-                + (f" | first={first_fail}" if first_fail else "")
-            )
-
-    # ── 4b. Попапы /business города ───────────────────────────────────────
-    with allure.step("Шаг 4b: попапы /business города"):
-        if not ENABLE_BUSINESS_SUBMIT_STEPS:
-            mark_step_not_applicable(
-                site_label,
-                "4b",
-                "попапы /business города",
-                "временно отключен",
-            )
-        elif is_url_mode:
-            mark_step_not_applicable(
-                site_label,
-                "4b",
-                "попапы /business города",
-                "url_mode: шаг отключен в первой итерации",
-            )
-        elif city_name is None:
-            mark_step_not_applicable(site_label, "4b", "попапы /business города", "city_name=None")
-        elif service_mode == SERVICE_MODE_VARIANTS:
-            mark_step_not_applicable(site_label, "4b", "попапы /business города", "service_mode=variants")
-        elif not cfg.get("has_business"):
-            mark_step_not_applicable(site_label, "4b", "попапы /business города", "has_business=False")
-        elif city_biz is None:
-            mark_step_not_applicable(site_label, "4b", "попапы /business города", "городской сценарий недоступен по условию")
-        else:
-            goto_business_or_handle_step(page, city_base, city_biz, site_label, "4b", "\u043f\u043e\u043f\u0430\u043f\u044b /business \u0433\u043e\u0440\u043e\u0434\u0430")
-            # close_overlays is already handled inside goto_business_or_handle_step
-            try:
-                s, f, first_fail, _ = process_business_popups(
-                    page, city_biz, has_name_field=has_name_field, service_mode=service_mode
-                )
-            except SiteUnavailableError as e:
-                skip_site_due_unavailability(site_label, "4b", "попапы /business города", str(e), page)
-            total_success_submits += s
-            if f > 0:
-                reason = f"{f} ошибок, {s} успешно"
-                if first_fail:
-                    reason += f" | first={first_fail}"
-                if total_success_submits > 0:
-                    print(
-                        "  [STEP-ALERT] ℹ️ suppressed alert for step 4b: "
-                        f"по URL найден успешный submit ({total_success_submits})"
-                    )
-                    f = 0
-                    first_fail = None
-                else:
-                    send_step_alert(site_label, "4b", "попапы /business города", reason[:900], page)
-            assert f == 0, (
-                f"[{site_label}] Бизнес города: {f} ошибок"
                 + (f" | first={first_fail}" if first_fail else "")
             )
 
