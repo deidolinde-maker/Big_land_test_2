@@ -1,2 +1,5 @@
-def pipeline = load 'jenkins/brand_pipeline.groovy'
+def pipeline
+node {
+  pipeline = load 'jenkins/brand_pipeline.groovy'
+}
 pipeline.runBrand('t2')
