@@ -16,6 +16,7 @@ from config.form_expectations import (
     optional_expected_form_types,
     load_brand_form_overrides,
 )
+from config.brand_scope import load_brand_scope_urls, scope_provider
 from config.loader import available_providers, load_site_configs
 from config.schema import derive_site_id
 
@@ -51,7 +52,12 @@ def _normalize_url(raw: str) -> str | None:
     return canonicalize_url(line)
 
 
-def load_urls_for_brand(brand: str, *, urls_dir: str | Path | None = None) -> list[str]:
+def load_urls_for_brand(
+    brand: str,
+    *,
+    urls_dir: str | Path | None = None,
+    url_file_name: str | None = None,
+) -> list[str]:
     brand_key = (brand or "").strip().lower()
     if brand_key not in URL_FILE_BY_BRAND:
         raise ValueError(
@@ -59,7 +65,7 @@ def load_urls_for_brand(brand: str, *, urls_dir: str | Path | None = None) -> li
         )
 
     root = _resolve_urls_dir(urls_dir)
-    file_name = URL_FILE_BY_BRAND[brand_key]
+    file_name = url_file_name or URL_FILE_BY_BRAND[brand_key]
     file_path = root / file_name
     if not file_path.exists():
         raise ValueError(f"Файл URL не найден: {file_path}")
@@ -86,6 +92,7 @@ def build_site_configs_from_urls(
     form_suite: str | None = None,
     url_shard_index: int = 1,
     url_shard_total: int = 1,
+    url_file_name: str | None = None,
 ) -> dict[str, dict]:
     """
     Строит runtime-конфиг для прямого обхода URL.
@@ -102,7 +109,7 @@ def build_site_configs_from_urls(
         )
 
     suite = normalize_form_suite(form_suite)
-    source_urls = load_urls_for_brand(brand_key, urls_dir=urls_dir)
+    source_urls = load_urls_for_brand(brand_key, urls_dir=urls_dir, url_file_name=url_file_name)
     source_urls = filter_urls_for_form_suite(source_urls, suite)
     if url_shard_total > 1:
         total = len(source_urls)
@@ -112,7 +119,7 @@ def build_site_configs_from_urls(
     if not source_urls:
         raise ValueError(
             f"Для бренда {brand_key!r} и form_suite={suite!r} не найдено URL. "
-            f"Проверьте urls/{URL_FILE_BY_BRAND[brand_key]} и allowlist формы. "
+            f"Проверьте URL-файл для бренда {brand_key!r} и allowlist формы. "
             f"(shard {url_shard_index}/{url_shard_total})"
         )
     provider_sites = load_site_configs(provider=brand_key)
@@ -168,6 +175,33 @@ def build_site_configs_from_urls(
         built[page_url] = cfg_copy
 
     return built
+
+
+def build_site_configs_from_brand_scope(
+    *,
+    scope: str,
+    url_shard_index: int = 1,
+    url_shard_total: int = 1,
+) -> dict[str, dict]:
+    """Build the reduced brand/AB scope used by the new Jenkins jobs."""
+    scope_key = (scope or "").strip().lower()
+    provider = scope_provider(scope_key)
+    load_brand_scope_urls(scope_key)
+    scope_dir = (Path(__file__).resolve().parent.parent / "urls" / "brand_scopes").resolve()
+    configs = build_site_configs_from_urls(
+        brand=provider,
+        urls_dir=scope_dir,
+        form_suite="all",
+        url_shard_index=url_shard_index,
+        url_shard_total=url_shard_total,
+        url_file_name=f"{scope_key}.txt",
+    )
+    for cfg in configs.values():
+        cfg["_brand_scope"] = scope_key
+        cfg["_brand_scope_provider"] = provider
+        cfg["_domain_session"] = scope_key in {"mts_gpon_ab", "mts_home_online_ab"}
+        cfg["_mts_ab_scenario"] = cfg["_domain_session"]
+    return configs
 
 
 def build_site_configs_from_all_urls(

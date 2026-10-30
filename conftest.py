@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 import allure
+from config.brand_scope import available_brand_scopes, is_ab_scope
 from config.form_expectations import available_form_suites
 
 ADBLOCK_MVP_BLOCKLIST = (
@@ -36,9 +37,9 @@ def pytest_addoption(parser):
     parser.addoption(
         "--run-mode",
         action="store",
-        default="legacy",
-        choices=("legacy", "form-oriented"),
-        help="Модель запуска: legacy (brand/suite) или form-oriented (одна primary форма).",
+        default="brand-oriented",
+        choices=("brand-oriented",),
+        help="Единственная модель запуска: brand-oriented.",
     )
     parser.addoption(
         "--primary-form",
@@ -46,6 +47,13 @@ def pytest_addoption(parser):
         default=None,
         choices=("profit", "connection", "connection_cards", "checkaddress", "undecided", "moving", "express"),
         help="Основная форма для form-oriented режима.",
+    )
+    parser.addoption(
+        "--brand-scope",
+        action="store",
+        default=None,
+        choices=available_brand_scopes(),
+        help="Сокращённый brand/AB scope для brand-oriented режима.",
     )
     parser.addoption(
         "--url-brand",
@@ -225,6 +233,27 @@ def browser_type_launch_args(browser_type_launch_args):
     merged_args["proxy"] = proxy
     print(f"[PLAYWRIGHT] Browser proxy enabled: {proxy['server']}")
     return merged_args
+
+
+@pytest.fixture(scope="session")
+def brand_context(browser, browser_context_args):
+    """One browser context for a brand job; reused by every URL in the job."""
+    context = browser.new_context(**browser_context_args)
+    yield context
+    context.close()
+
+
+@pytest.fixture
+def page(request):
+    """Use one context per URL by default, or one context per brand job."""
+    run_mode = str(request.config.getoption("--run-mode", default="brand-oriented") or "brand-oriented").strip().lower()
+    brand_scope = str(request.config.getoption("--brand-scope", default="") or "").strip().lower()
+    use_domain_session = run_mode == "brand-oriented" and is_ab_scope(brand_scope)
+    context = request.getfixturevalue("brand_context" if use_domain_session else "context")
+    current_page = context.new_page()
+    yield current_page
+    current_page.close()
+
 
 @pytest.fixture(autouse=True)
 def apply_blocking_profile(page, blocking_profile):

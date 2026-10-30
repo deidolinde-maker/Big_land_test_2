@@ -1,0 +1,1 @@
+"""Isolated MTS AB scenarios."""

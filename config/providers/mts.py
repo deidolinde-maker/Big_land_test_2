@@ -27,4 +27,10 @@ SITES = [
         "has_business": False,
         "cities": ["Москва"],
     },
+    {
+        "base_url": "https://mts-internet.online/",
+        "has_checkaddress": False,
+        "has_business": False,
+        "cities": ["Москва"],
+    },
 ]

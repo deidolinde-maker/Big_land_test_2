@@ -111,7 +111,7 @@ def clear_alert_events() -> None:
 
 def runtime_scope_key() -> str:
     job = (os.getenv("JOB_NAME") or "local").strip()
-    scope = (os.getenv("PROVIDER_SCOPE") or "all").strip()
+    scope = (os.getenv("BRAND_SCOPE") or os.getenv("PROVIDER_SCOPE") or "all").strip()
     return f"{job}|{scope}"
 
 

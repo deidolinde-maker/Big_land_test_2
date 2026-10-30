@@ -29,9 +29,11 @@ from zoneinfo import ZoneInfo
 from site_configs import select_site_configs
 from config.url_loader import (
     available_url_brands,
+    build_site_configs_from_brand_scope,
     build_site_configs_from_all_urls,
     build_site_configs_from_urls,
 )
+from config.brand_scope import available_brand_scopes
 from alert_events import queue_alert_event
 
 try:
@@ -870,8 +872,11 @@ def popup_click_settle_ms(page: Page | None) -> int:
 def pytest_generate_tests(metafunc):
     """Параметризует фикстуру site_cfg — один прогон на каждый сайт."""
     if "site_cfg" in metafunc.fixturenames:
-        run_mode = str(metafunc.config.getoption("--run-mode", default="legacy") or "legacy").strip().lower()
+        run_mode = str(metafunc.config.getoption("--run-mode", default="brand-oriented") or "brand-oriented").strip().lower()
+        if run_mode != "brand-oriented":
+            raise pytest.UsageError("В Big_land_test_2 поддерживается только brand-oriented режим.")
         primary_form_arg = metafunc.config.getoption("--primary-form", default=None)
+        brand_scope_arg = metafunc.config.getoption("--brand-scope", default=None)
         url_brand_arg = metafunc.config.getoption("--url-brand", default=None)
         form_suite_arg = metafunc.config.getoption("--form-suite", default="all")
         provider_arg = metafunc.config.getoption("--provider", default=None)
@@ -884,6 +889,7 @@ def pytest_generate_tests(metafunc):
         url_brand = (url_brand_arg or "").strip().lower()
         form_suite = (form_suite_arg or "all").strip().lower()
         primary_form = (primary_form_arg or "").strip().lower()
+        brand_scope = (brand_scope_arg or "").strip().lower()
 
         if run_mode == "form-oriented":
             if not primary_form:
@@ -903,6 +909,29 @@ def pytest_generate_tests(metafunc):
                 selected_items = list(
                     build_site_configs_from_all_urls(
                         primary_form=primary_form,
+                        url_shard_index=url_shard_index,
+                        url_shard_total=url_shard_total,
+                    ).items()
+                )
+            except ValueError as exc:
+                raise pytest.UsageError(str(exc)) from exc
+        elif run_mode == "brand-oriented":
+            if not brand_scope:
+                raise pytest.UsageError(
+                    "--brand-scope обязателен в --run-mode=brand-oriented."
+                )
+            if primary_form or url_brand or provider_arg or site_arg:
+                raise pytest.UsageError(
+                    "brand-oriented режим использует только --brand-scope."
+                )
+            if form_suite != "all":
+                raise pytest.UsageError(
+                    "В brand-oriented режиме --form-suite должен быть all."
+                )
+            try:
+                selected_items = list(
+                    build_site_configs_from_brand_scope(
+                        scope=brand_scope,
                         url_shard_index=url_shard_index,
                         url_shard_total=url_shard_total,
                     ).items()
@@ -934,7 +963,7 @@ def pytest_generate_tests(metafunc):
             )
 
         try:
-            if run_mode == "form-oriented":
+            if run_mode in {"form-oriented", "brand-oriented"}:
                 pass
             elif url_brand:
                 if url_brand not in available_url_brands():
@@ -973,6 +1002,8 @@ def pytest_generate_tests(metafunc):
             cfg_copy["_run_mode"] = run_mode
             if run_mode == "form-oriented":
                 cfg_copy["_primary_form"] = primary_form
+            if run_mode == "brand-oriented":
+                cfg_copy["_brand_scope"] = brand_scope
             configs.append(cfg_copy)
             id_parts: list[str] = [site_id]
             if service_mode != SERVICE_MODE_ALL:
@@ -981,6 +1012,8 @@ def pytest_generate_tests(metafunc):
                 id_parts.append(f"form:{form_suite}")
             if run_mode == "form-oriented":
                 id_parts.append(f"primary:{primary_form}")
+            if run_mode == "brand-oriented":
+                id_parts.append(f"scope:{brand_scope}")
             ids.append(id_parts[0] + "".join(f"[{part}]" for part in id_parts[1:]))
 
         metafunc.parametrize("site_cfg", configs, ids=ids)
@@ -4731,6 +4764,15 @@ def test_site(
     )
     allure.dynamic.label("suite", "Формы провайдеров")
     allure.dynamic.label("subSuite", f"service-mode: {service_mode}")
+    brand_scope = str(site_cfg.get("_brand_scope") or "").strip()
+    if brand_scope:
+        allure.dynamic.label("runMode", "brand-oriented")
+        allure.dynamic.label("brandScope", brand_scope)
+        allure.dynamic.parameter("brand_scope", brand_scope)
+        allure.dynamic.parameter(
+            "domain_session",
+            "true" if site_cfg.get("_domain_session") else "false",
+        )
     requested_form_suite = str(site_cfg.get("_requested_form_suite") or "all").strip().lower()
     if requested_form_suite != "all":
         allure.dynamic.label("parentSuite", f"form-suite: {requested_form_suite}")

@@ -8,12 +8,12 @@ pipeline {
   }
 
   parameters {
-    choice(name: 'PRIMARY_FORM', choices: ['', 'profit', 'connection', 'checkaddress', 'undecided', 'moving', 'express'], description: 'Основная форма текущей job.')
+    choice(name: 'RUN_MODE', choices: ['brand-oriented'], description: 'Модель запуска.')
+    choice(name: 'BRAND_SCOPE', choices: ['beeline', 'mega', 'mts', 'providerdom', 'rtk', 't2', 'mts_gpon_ab', 'mts_home_online_ab'], description: 'Brand или изолированный MTS AB scope для brand-oriented режима.')
     choice(name: 'SERVICE_MODE', choices: ['core', 'variants', 'all'], description: 'Service mode to run.')
     booleanParam(name: 'ENABLE_CONTINUOUS_LOOP', defaultValue: false, description: 'After summary, schedule next build with same params.')
     string(name: 'LOOP_DELAY_SECONDS', defaultValue: '60', description: 'Delay before scheduling next loop build.')
     string(name: 'CHAIN_NEXT_JOB', defaultValue: '', description: 'Optional: next Jenkins job name for chained 24/7 run.')
-    string(name: 'CHAIN_NEXT_FORM', defaultValue: '', description: 'Optional: next PRIMARY_FORM. Empty in form-oriented mode means automatic form rotation.')
     booleanParam(name: 'ENABLE_PERIODIC_ARTIFACT_PURGE', defaultValue: true, description: 'Every N builds, delete archived artifacts/allure reports of previous builds for this job.')
     string(name: 'PERIODIC_PURGE_EVERY', defaultValue: '5', description: 'Run full artifact purge every N-th build (integer >= 2).')
 
@@ -32,7 +32,7 @@ pipeline {
   }
 
   environment {
-    RUN_MODE = 'form-oriented'
+    RUN_MODE = 'brand-oriented'
     FORM_SUITE = 'all'
     PROVIDER_SCOPE = 'release_chain'
     PLAYWRIGHT_BROWSERS_PATH = '/var/lib/jenkins/cache/ms-playwright'
@@ -71,11 +71,11 @@ pipeline {
           if ((params.PERIODIC_PURGE_EVERY ?: '').trim() && !((params.PERIODIC_PURGE_EVERY as String) ==~ /\d+/)) {
             error('PERIODIC_PURGE_EVERY must be an integer >= 2.')
           }
-          if (!(params.PRIMARY_FORM ?: '').trim()) {
-            error('PRIMARY_FORM is required when RUN_MODE=form-oriented.')
+          if (!(params.BRAND_SCOPE ?: '').trim()) {
+            error('BRAND_SCOPE is required when RUN_MODE=brand-oriented.')
           }
           if (params.ENABLE_CONTINUOUS_LOOP && !(params.CHAIN_NEXT_JOB ?: '').trim()) {
-            error('CHAIN_NEXT_JOB is required for a form-oriented continuous chain.')
+            error('CHAIN_NEXT_JOB is required for a brand-oriented continuous chain.')
           }
         }
       }
@@ -246,7 +246,71 @@ pipeline {
           rm -rf allure-results allure-results-* || true
           mkdir -p allure-results
 
-          if [ "${RUN_MODE}" = "form-oriented" ]; then
+          if [ "${RUN_MODE}" = "brand-oriented" ]; then
+            echo "[BRAND-ORIENTED] scope=${BRAND_SCOPE} | one context per job"
+            ran_suites=1
+            skipped_suites=0
+
+            run_brand_one() {
+              mode="$1"
+              browser="$2"
+              profile="$3"
+              suffix="$4"
+              allure_dir="allure-results-brand-${BRAND_SCOPE}-${mode}-${suffix}"
+              test_file="big_landing_code.py"
+              if [ "${BRAND_SCOPE}" = "mts_gpon_ab" ] || [ "${BRAND_SCOPE}" = "mts_home_online_ab" ]; then
+                test_file="mts_ab_tests/test_mts_ab.py"
+              fi
+              PYTEST_ARGS="${test_file} --alluredir=${allure_dir} --timeout=600 -s --service-mode=${mode} --browser=${browser} --blocking-profile=${BLOCKING_PROFILE} --run-mode=brand-oriented --brand-scope=${BRAND_SCOPE} --url-shard-index=1 --url-shard-total=1"
+              if [ -n "${profile}" ]; then
+                PYTEST_ARGS="${PYTEST_ARGS} --execution-profile=${profile}"
+              fi
+              echo "Running brand-oriented: scope=${BRAND_SCOPE} mode=${mode} browser=${browser} profile=${profile:-desktop}"
+              echo "Pytest args: ${PYTEST_ARGS}"
+              "${pybin}" -m pytest ${PYTEST_ARGS}
+            }
+
+            if [ "${RUN_CHROMIUM}" = "true" ]; then
+              if [ "${SERVICE_MODE}" = "core" ] || [ "${SERVICE_MODE}" = "all" ]; then
+                run_brand_one "core" "chromium" "" "chromium"
+              fi
+              if [ "${SERVICE_MODE}" = "variants" ] || [ "${SERVICE_MODE}" = "all" ]; then
+                run_brand_one "variants" "chromium" "" "chromium"
+              fi
+            fi
+            if [ "${RUN_FIREFOX}" = "true" ]; then
+              if [ "${SERVICE_MODE}" = "core" ] || [ "${SERVICE_MODE}" = "all" ]; then
+                run_brand_one "core" "firefox" "" "firefox"
+              fi
+              if [ "${SERVICE_MODE}" = "variants" ] || [ "${SERVICE_MODE}" = "all" ]; then
+                run_brand_one "variants" "firefox" "" "firefox"
+              fi
+            fi
+            if [ "${RUN_WEBKIT}" = "true" ]; then
+              if [ "${SERVICE_MODE}" = "core" ] || [ "${SERVICE_MODE}" = "all" ]; then
+                run_brand_one "core" "webkit" "" "webkit"
+              fi
+              if [ "${SERVICE_MODE}" = "variants" ] || [ "${SERVICE_MODE}" = "all" ]; then
+                run_brand_one "variants" "webkit" "" "webkit"
+              fi
+            fi
+            if [ "${RUN_MOBILE_CHROMIUM}" = "true" ]; then
+              if [ "${SERVICE_MODE}" = "core" ] || [ "${SERVICE_MODE}" = "all" ]; then
+                run_brand_one "core" "chromium" "mobile-chromium" "mobile-chromium"
+              fi
+              if [ "${SERVICE_MODE}" = "variants" ] || [ "${SERVICE_MODE}" = "all" ]; then
+                run_brand_one "variants" "chromium" "mobile-chromium" "mobile-chromium"
+              fi
+            fi
+            if [ "${RUN_MOBILE_WEBKIT}" = "true" ]; then
+              if [ "${SERVICE_MODE}" = "core" ] || [ "${SERVICE_MODE}" = "all" ]; then
+                run_brand_one "core" "webkit" "mobile-webkit" "mobile-webkit"
+              fi
+              if [ "${SERVICE_MODE}" = "variants" ] || [ "${SERVICE_MODE}" = "all" ]; then
+                run_brand_one "variants" "webkit" "mobile-webkit" "mobile-webkit"
+              fi
+            fi
+          elif [ "${RUN_MODE}" = "form-oriented" ]; then
             echo "[FORM-ORIENTED] primary form=${PRIMARY_FORM} | provider scope=${PROVIDER_SCOPE} (all active brands)"
             ran_suites=1
             skipped_suites=0
@@ -701,6 +765,40 @@ PY
       echo "Build URL: ${env.BUILD_URL}"
       script {
         if (params.ENABLE_CONTINUOUS_LOOP) {
+          if (params.RUN_MODE == 'brand-oriented') {
+            def nextJobName = (params.CHAIN_NEXT_JOB ?: '').trim()
+            int quietSeconds = 60
+            try {
+              quietSeconds = (params.LOOP_DELAY_SECONDS as Integer)
+            } catch (Exception ignored) {
+              quietSeconds = 60
+            }
+            if (!nextJobName) {
+              error('CHAIN_NEXT_JOB is required for a brand-oriented continuous chain.')
+            }
+            echo "Continuous brand loop enabled: job='${nextJobName}', brand_scope='${params.BRAND_SCOPE}', delay=${quietSeconds}s."
+            build job: nextJobName,
+              wait: false,
+              quietPeriod: quietSeconds,
+              parameters: [
+                string(name: 'RUN_MODE', value: 'brand-oriented'),
+                string(name: 'BRAND_SCOPE', value: params.BRAND_SCOPE),
+                string(name: 'SERVICE_MODE', value: params.SERVICE_MODE),
+                string(name: 'BLOCKING_PROFILE', value: params.BLOCKING_PROFILE),
+                string(name: 'LOOP_DELAY_SECONDS', value: params.LOOP_DELAY_SECONDS),
+                booleanParam(name: 'ENABLE_CONTINUOUS_LOOP', value: params.ENABLE_CONTINUOUS_LOOP),
+                booleanParam(name: 'RUN_CHROMIUM', value: params.RUN_CHROMIUM),
+                booleanParam(name: 'RUN_FIREFOX', value: params.RUN_FIREFOX),
+                booleanParam(name: 'RUN_WEBKIT', value: params.RUN_WEBKIT),
+                booleanParam(name: 'RUN_MOBILE_CHROMIUM', value: params.RUN_MOBILE_CHROMIUM),
+                booleanParam(name: 'RUN_MOBILE_WEBKIT', value: params.RUN_MOBILE_WEBKIT),
+                booleanParam(name: 'ALERT_ERRORS', value: params.ALERT_ERRORS),
+                booleanParam(name: 'ALERT_AGGREGATES', value: params.ALERT_AGGREGATES),
+                booleanParam(name: 'ALERT_SUMMARY', value: params.ALERT_SUMMARY),
+                booleanParam(name: 'ALERT_RECOVERED', value: params.ALERT_RECOVERED),
+                booleanParam(name: 'USE_TELEGRAM_PROXY', value: params.USE_TELEGRAM_PROXY),
+              ]
+          } else {
           def autoNextFormMap = [
             'profit': 'connection',
             'connection': 'checkaddress',
@@ -743,6 +841,7 @@ PY
               booleanParam(name: 'ALERT_RECOVERED', value: params.ALERT_RECOVERED),
               booleanParam(name: 'USE_TELEGRAM_PROXY', value: params.USE_TELEGRAM_PROXY),
             ]
+          }
         }
       }
       script {
