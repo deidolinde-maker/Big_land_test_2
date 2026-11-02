@@ -533,6 +533,7 @@ POPUP_BUTTON_CLASSES = {
 }
 
 MTS_HOME_ONLINE_HOST = "mts-home-online.ru"
+MTS_DEBUG_QUERY = "_ym_debug=1"
 MTS_ONLINE_NEW_SITE_VERSION = "wordpress_new"
 MTS_ONLINE_CLASSIC_SITE_VERSION = "wordpress_old"
 MTS_ONLINE_FORM_TYPE = "mts_home_online_address"
@@ -553,6 +554,24 @@ MTS_ONLINE_CHECKADDRESS_CONFIG = {
 def _is_mts_home_online_url(url: str) -> bool:
     host = (urlsplit(url or "").hostname or "").lower().rstrip(".")
     return host == MTS_HOME_ONLINE_HOST
+
+
+def _is_mts_home_online_root(url: str) -> bool:
+    parsed = urlsplit(url or "")
+    return (
+        (parsed.hostname or "").lower().rstrip(".") == MTS_HOME_ONLINE_HOST
+        and (parsed.path or "").rstrip("/") == ""
+    )
+
+
+def _with_mts_debug_query(url: str) -> str:
+    if not _is_mts_home_online_root(url):
+        return url
+    parsed = urlsplit(url)
+    query = parsed.query
+    if "_ym_debug=" not in query:
+        query = f"{query}&{MTS_DEBUG_QUERY}" if query else MTS_DEBUG_QUERY
+    return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, query, parsed.fragment))
 
 
 def _use_mts_online_locators(page: Page | None) -> bool:
@@ -1161,7 +1180,12 @@ def safe_goto(
 
     for attempt in range(1, retries + 1):
         try:
-            response = page.goto(url, wait_until="domcontentloaded", timeout=goto_timeout_ms)
+            navigation_url = _with_mts_debug_query(url)
+            response = page.goto(
+                navigation_url,
+                wait_until="domcontentloaded",
+                timeout=goto_timeout_ms,
+            )
             page.wait_for_timeout(500)
             refresh_mts_home_online_version(page, url)
 
@@ -1183,7 +1207,10 @@ def safe_goto(
                 page.wait_for_timeout(1500)
                 continue
 
-            print(f"  [NAV] {url}")
+            if navigation_url != url:
+                print(f"  [NAV] {url} (debug: {navigation_url})")
+            else:
+                print(f"  [NAV] {url}")
             return True, False, ""
         except Exception as e:
             last_error = str(e).replace("\n", " ")[:220]
