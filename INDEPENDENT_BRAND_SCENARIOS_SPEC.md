@@ -124,7 +124,7 @@ URL:
 https://mts-home-online.ru/
 https://mts-home-online.ru/moskva
 https://mts-home-online.ru/sankt-peterburg
-https://mts-home-online.ru/voronezh
+https://mts-home-online.ru/vladimir
 ```
 
 Сценарий изолирован от GPON, использует собственные version rules и локаторы AB-вариантов.

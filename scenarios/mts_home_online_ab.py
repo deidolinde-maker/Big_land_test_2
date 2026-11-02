@@ -538,7 +538,7 @@ MTS_ONLINE_NEW_SITE_VERSION = "wordpress_new"
 MTS_ONLINE_CLASSIC_SITE_VERSION = "wordpress_old"
 MTS_ONLINE_FORM_TYPE = "mts_home_online_address"
 MTS_ONLINE_CHECKADDRESS_CONFIG = {
-    "root": "form[data-address-form][data-form-type='connection_address']",
+    "root": "form[data-address-form]",
     "street": "[data-street-input]",
     "house": "[data-house-input]",
     "phone": "input[name='Phone']",
@@ -2347,6 +2347,25 @@ def wait_for_popup_with_fields(page: Page, timeout_ms: int = 10_000,
     elapsed = 0
 
     while elapsed < timeout_ms:
+        if _use_mts_online_locators(page):
+            try:
+                forms = page.locator(MTS_ONLINE_CHECKADDRESS_CONFIG["root"])
+                for form_index in range(forms.count() - 1, -1, -1):
+                    form = forms.nth(form_index)
+                    if not form.is_visible():
+                        continue
+                    phone = form.locator(MTS_ONLINE_CHECKADDRESS_CONFIG["phone"]).first
+                    street = form.locator(MTS_ONLINE_CHECKADDRESS_CONFIG["street"]).first
+                    submit = form.locator(MTS_ONLINE_CHECKADDRESS_CONFIG["submit"]).first
+                    if phone.is_visible() and street.is_visible() and submit.count() > 0:
+                        print(
+                            f"  [POPUP] active MTS online form idx={form_index} "
+                            f"type='{form_types_to_check[0][0]}'"
+                        )
+                        return form_types_to_check[0][0], form
+            except Exception:
+                pass
+
         for popup_sel in POPUP_CONTAINER_SELECTORS:
             for form_type, cfg in form_types_to_check:
                 containers = page.locator(popup_sel)
