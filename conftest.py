@@ -1,4 +1,6 @@
 import os
+import json
+import re
 from pathlib import Path
 
 import pytest
@@ -192,6 +194,66 @@ def page(request):
     use_domain_session = run_mode == "brand-oriented" and is_ab_scope(brand_scope)
     context = request.getfixturevalue("brand_context" if use_domain_session else "context")
     current_page = context.new_page()
+
+    def capture_mts_site_version(message):
+        """Capture MTS site_version emitted by Yandex debug console payloads."""
+        try:
+            text = message.text or ""
+        except Exception:
+            return
+
+        patterns = (
+            r"[\"']site_version[\"']\s*:\s*[\"']([^\"']+)[\"']",
+            r"\bsite_version\b\s*[:=]\s*[\"']?([A-Za-z0-9_.-]+)",
+        )
+        version = None
+        for pattern in patterns:
+            match = re.search(pattern, text, flags=re.IGNORECASE)
+            if match:
+                version = match.group(1).strip()
+                break
+
+        def find_version(value):
+            if isinstance(value, dict):
+                for key, item in value.items():
+                    if str(key).strip().lower() == "site_version":
+                        return str(item).strip() if item is not None else None
+                    nested = find_version(item)
+                    if nested:
+                        return nested
+            elif isinstance(value, (list, tuple)):
+                for item in value:
+                    nested = find_version(item)
+                    if nested:
+                        return nested
+            elif isinstance(value, str) and "site_version" in value.lower():
+                try:
+                    return find_version(json.loads(value))
+                except Exception:
+                    match = re.search(
+                        r"[\"']site_version[\"']\s*:\s*[\"']([^\"']+)[\"']",
+                        value,
+                        flags=re.IGNORECASE,
+                    )
+                    return match.group(1).strip() if match else None
+            return None
+
+        if not version:
+            try:
+                for arg in message.args:
+                    version = find_version(arg.json_value())
+                    if version:
+                        break
+            except Exception:
+                pass
+
+        if version:
+            previous = getattr(current_page, "_mts_console_site_version", None)
+            current_page._mts_console_site_version = version
+            if previous != version:
+                print(f"  [VERSION] Console site_version: {version}")
+
+    current_page.on("console", capture_mts_site_version)
     yield current_page
     current_page.close()
 
