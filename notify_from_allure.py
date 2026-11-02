@@ -157,13 +157,15 @@ def build_runtime_alert(events: list[dict]) -> tuple[str, bool, str]:
         lines = [
             f"❌ {headline}",
             f"🌐 Домен: {first.get('domain') or first.get('site') or 'unknown-site'}",
-            f"🔎 Шаг: {first.get('step') or 'не указан'}",
-            f"Детали: {first.get('details') or 'без деталей'}",
-            f"Страницы ({len(pages)}):",
+            f"🧩 Шаг: {first.get('step') or 'не указан'}",
+            f"📌 Детали: {first.get('details') or 'без деталей'}",
+            f"📄 Страницы: {len(pages)}",
+            "",
+            "Список страниц:",
         ]
-        lines.extend(f"• {page}" for page in pages[:25])
+        lines.extend(f"{index}. {page}" for index, page in enumerate(pages[:25], 1))
         if len(pages) > 25:
-            lines.append(f"• ... и еще {len(pages) - 25}")
+            lines.append(f"... и еще {len(pages) - 25}")
         blocks.append("\n".join(lines))
         current[group_key] = {
             "domain": first.get("domain") or first.get("site"),
@@ -191,12 +193,37 @@ def build_runtime_alert(events: list[dict]) -> tuple[str, bool, str]:
     if not blocks:
         return "", False, "step"
     header = "🚨 Критические ошибки автотеста" if has_critical else "🚨 Ошибки автотеста"
-    message = trim_message("\n\n".join([header, f"🕒 Время: {now_msk_text()}", *blocks]))
+    message_lines = [
+        header,
+        f"🕒 {now_msk_text()}",
+        f"🏷️ Скоуп: {notification_scope()}",
+        *blocks,
+    ]
+    append_report_links(message_lines)
+    message = trim_message(
+        "\n\n".join(message_lines)
+    )
     return message, True, "critical" if has_critical else "step"
 
 
 def now_msk_text() -> str:
     return datetime.now(MSK_TZ).strftime("%Y-%m-%d %H:%M (МСК)")
+
+
+def notification_scope() -> str:
+    return (
+        os.getenv("BRAND_SCOPE", "").strip()
+        or os.getenv("PROVIDER_SCOPE", "").strip()
+        or os.getenv("JOB_NAME", "").strip()
+        or "общий прогон"
+    )
+
+
+def append_report_links(lines: list[str]) -> None:
+    if RUN_URL:
+        lines.extend(["", "🔗 Jenkins:", RUN_URL])
+    if ALLURE_URL:
+        lines.extend(["", "📊 Allure:", ALLURE_URL])
 
 
 def detect_step(message: str, name: str) -> str:
@@ -413,26 +440,37 @@ def build_period_summary(runs: list[dict], slot: str) -> str:
 
     first_time = runs[0].get("timestamp") if runs else ""
     lines = [
-        f"Сводный отчет автотестов форм заявок за период {first_time} - {now_msk_text()}",
+        "🧪 Everyday_test · Сводный отчёт",
         "",
-        f"Прогонов: {len(runs)}",
-        f"Успешных проверок: {total_passed}",
-        f"Ошибок: {len(all_failures)}",
+        f"🏷️ Скоуп: {notification_scope()}",
+        f"🕒 Период: {first_time} — {now_msk_text()}",
+        "",
+        "📊 Результат",
+        f"• Прогонов: {len(runs)}",
+        f"• Успешных проверок: {total_passed}",
+        f"• Ошибок: {len(all_failures)}",
     ]
     if all_failures:
-        lines.extend(["", "Ошибки по сайтам и шагам:"])
-        for (site, step), items in sorted(grouped.items(), key=lambda pair: len(pair[1]), reverse=True):
+        lines.extend(["", f"❌ Ошибки по сайтам ({len(grouped)}):"])
+        for index, ((site, step), items) in enumerate(
+            sorted(grouped.items(), key=lambda pair: len(pair[1]), reverse=True),
+            1,
+        ):
             sample = normalize_text(items[0].get("message") or "без деталей", max_len=180)
-            lines.append(f"- {site} / {step}: {len(items)}")
-            lines.append(f"  Пример: {sample}")
+            lines.extend(
+                [
+                    "",
+                    f"{index}) 🌐 {site}",
+                    f"   🧩 Шаг: {step}",
+                    f"   📌 Количество: {len(items)}",
+                    f"   💬 Пример: {sample}",
+                ]
+            )
     else:
-        lines.extend(["", "Ошибок за период не зафиксировано."])
+        lines.extend(["", "✅ Ошибок за период не зафиксировано."])
 
-    lines.extend(["", f"Отчет сформирован для окна {slot} по Москве."])
-    if RUN_URL:
-        lines.append(f"Run: {RUN_URL}")
-    if ALLURE_URL:
-        lines.append(f"Allure: {ALLURE_URL}")
+    lines.extend(["", f"⏱️ Отчёт сформирован для окна: {slot} (МСК)"])
+    append_report_links(lines)
     return trim_message("\n".join(lines).strip())
 
 
@@ -480,11 +518,10 @@ def format_single_error_block(
     detail = normalize_text(sample.get("message") or sample.get("name") or "без деталей", max_len=220)
     return "\n".join(
         [
-            f"🚨 Ошибка глобального автотеста формы [{DEFAULT_FORM_TITLE}]",
-            f"🕒 Время: {now_msk_text()}",
+            "❌ Ошибка автотеста",
             f"🌐 Лендинг: {site}",
-            f"❌ Ошибка: {step}",
-            f"🔎 Детали: {detail}",
+            f"🧩 Шаг: {step}",
+            f"📌 Детали: {detail}",
         ]
     )
 
@@ -498,10 +535,9 @@ def format_aggregate_block(
     pct = round((len(items) / max(total_failed, 1)) * 100)
     return "\n".join(
         [
-            f"🚨 Ошибка глобального автотеста формы [{DEFAULT_FORM_TITLE}]",
-            f"🕒 Время: {now_msk_text()}",
+            "🚨 Массовая ошибка автотеста",
             f"🌐 Лендинг: {site}",
-            f"❌ Ошибка: {step}",
+            f"🧩 Шаг: {step}",
             f"📊 Масштаб: {len(items)} падений ({pct}%)",
         ]
     )
@@ -546,6 +582,7 @@ def build_summary(
             lines.extend([f"✅ Глобальный автотест форм заявок завершён ({now_msk_text()})", ""])
         else:
             lines.extend([f"🚨 Глобальный автотест форм заявок завершён с ошибками ({now_msk_text()})", ""])
+        lines.append(f"🏷️ Скоуп: {notification_scope()}")
         if SITE_HINT:
             lines.append(f"Сайт (input): {SITE_HINT}")
             lines.append("")
@@ -598,8 +635,7 @@ def build_summary(
             lines.append("")
             lines.extend(
                 [
-                    f"✅ Ошибка устранена: глобального автотеста формы [{DEFAULT_FORM_TITLE}]",
-                    f"🕒 Время: {now_msk_text()}",
+                    "✅ Ошибка устранена",
                     f"🌐 Лендинг: {site}",
                 ]
             )
@@ -608,11 +644,7 @@ def build_summary(
             lines.append(f"… и ещё восстановлений: {len(resolved_sites) - 10}")
 
     if has_any_category_output:
-        lines.append("")
-        if RUN_URL:
-            lines.append(f"Run: {RUN_URL}")
-        if ALLURE_URL:
-            lines.append(f"Allure: {ALLURE_URL}")
+        append_report_links(lines)
 
     return trim_message("\n".join(lines).strip()), has_any_category_output
 
