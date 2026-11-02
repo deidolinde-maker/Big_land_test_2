@@ -537,15 +537,44 @@ MTS_DEBUG_QUERY = "_ym_debug=1"
 MTS_ONLINE_NEW_SITE_VERSION = "wordpress_new"
 MTS_ONLINE_CLASSIC_SITE_VERSION = "wordpress_old"
 MTS_ONLINE_FORM_TYPE = "mts_home_online_address"
+MTS_ONLINE_FORM_ROOT = (
+    "form[data-address-form], "
+    "form.AdressForm.lead-form, "
+    "form.AddressModalForm.lead-form"
+)
+MTS_ONLINE_POPUP_BUTTON_SELECTOR = (
+    "button[data-modal-open='address'], "
+    "[data-modal-open='address'][role='button'], "
+    "button[data-modal-open='floating-lead'], "
+    "[data-modal-open='floating-lead'][role='button'], "
+    ".tariffs__address"
+)
+MTS_ONLINE_POPUP_BUTTON_GROUPS = (
+    ("button[data-modal-open='address'], [data-modal-open='address'][role='button']", "connection"),
+    ("button[data-modal-open='floating-lead'], [data-modal-open='floating-lead'][role='button']", "express-connection"),
+    (".tariffs__address", "connection"),
+)
 MTS_ONLINE_CHECKADDRESS_CONFIG = {
-    "root": "form[data-address-form]",
-    "street": "[data-street-input]",
-    "house": "[data-house-input]",
-    "phone": "input[name='Phone']",
-    "submit": "[data-lead-submit]",
-    "city": "[data-city-input]",
-    "street_suggestions": "[data-street-results]",
-    "house_suggestions": "[data-house-results]",
+    # В новых шаблонах встречаются оба класса формы: исторический AdressForm
+    # и текущий AddressModalForm. data-address-form остаётся главным маркером.
+    "root": MTS_ONLINE_FORM_ROOT,
+    "street": (
+        "input[data-street-input], "
+        "input[name='Street']:not([data-business-street-input]):not(:disabled)"
+    ),
+    "house": (
+        "input[data-house-input], "
+        "input[name='House']:not([data-business-house-input]):not(:disabled)"
+    ),
+    "phone": "input[type='tel'][name='Phone'], input[name='Phone']",
+    "submit": (
+        "button[data-lead-submit], input[data-lead-submit], "
+        "button[type='submit'][data-lead-submit], input[type='submit'][data-lead-submit]"
+    ),
+    "city": "input[data-city-input], input[name='City']",
+    "street_suggestions": "[data-street-results], .street-results",
+    "house_suggestions": "[data-house-results], .house-results",
+    "trigger": MTS_ONLINE_POPUP_BUTTON_SELECTOR,
     "no_house": False,
     "no_suggest": False,
 }
@@ -605,9 +634,11 @@ def refresh_mts_home_online_version(page: Page, url: str) -> None:
 
     try:
         dom_marker = page.locator(
-            "form[data-address-form] [data-street-input], "
-            "form[data-address-form] [data-house-input], "
-            "form[data-address-form] [data-lead-submit]"
+            f"{MTS_ONLINE_FORM_ROOT} [data-street-input], "
+            f"{MTS_ONLINE_FORM_ROOT} input[name='Street'], "
+            f"{MTS_ONLINE_FORM_ROOT} [data-house-input], "
+            f"{MTS_ONLINE_FORM_ROOT} input[name='House'], "
+            f"{MTS_ONLINE_FORM_ROOT} [data-lead-submit]"
         ).count() > 0
     except Exception:
         dom_marker = False
@@ -2357,7 +2388,7 @@ def wait_for_popup_with_fields(page: Page, timeout_ms: int = 10_000,
                     phone = form.locator(MTS_ONLINE_CHECKADDRESS_CONFIG["phone"]).first
                     street = form.locator(MTS_ONLINE_CHECKADDRESS_CONFIG["street"]).first
                     submit = form.locator(MTS_ONLINE_CHECKADDRESS_CONFIG["submit"]).first
-                    if phone.is_visible() and street.is_visible() and submit.count() > 0:
+                    if phone.is_visible() and street.is_visible() and submit.is_visible():
                         print(
                             f"  [POPUP] active MTS online form idx={form_index} "
                             f"type='{form_types_to_check[0][0]}'"
@@ -2392,7 +2423,8 @@ def wait_for_popup_with_fields(page: Page, timeout_ms: int = 10_000,
                         continue
                     phone = modal.locator(MTS_ONLINE_CHECKADDRESS_CONFIG["phone"]).first
                     street = modal.locator(MTS_ONLINE_CHECKADDRESS_CONFIG["street"]).first
-                    if phone.is_visible() and street.is_visible():
+                    submit = modal.locator(MTS_ONLINE_CHECKADDRESS_CONFIG["submit"]).first
+                    if phone.is_visible() and street.is_visible() and submit.is_visible():
                         print(
                             f"  [POPUP] active MTS online modal idx={modal_index} "
                             f"type='{form_types_to_check[0][0]}'"
@@ -2499,24 +2531,34 @@ def collect_popup_buttons(
     print(f"\n[COLLECT] Кнопок на странице: {total}")
 
     if _use_mts_online_locators(page):
-        buttons = page.locator(".tariffs__address")
-        for idx in range(buttons.count()):
-            button = buttons.nth(idx)
-            try:
-                if not button.is_visible() or not button.is_enabled():
-                    continue
-                result.append(
-                    {
-                        "index": -1,
-                        "text": (button.inner_text() or "").strip().lower(),
-                        "form_hint": "connection",
-                        "css": ".tariffs__address",
-                        "css_nth": idx,
-                    }
-                )
-                print(f"  [COLLECT] MTS online #{len(result)} (connection)")
-            except Exception:
-                pass
+        for button_selector, form_hint in MTS_ONLINE_POPUP_BUTTON_GROUPS:
+            buttons = page.locator(button_selector)
+            for idx in range(buttons.count()):
+                button = buttons.nth(idx)
+                try:
+                    if not button.is_visible() or not button.is_enabled():
+                        continue
+                    global_idx = button.evaluate(
+                        "el => Array.from(document.querySelectorAll('button')).indexOf(el)"
+                    )
+                    if isinstance(global_idx, int) and global_idx >= 0:
+                        if global_idx in seen_idx:
+                            continue
+                        seen_idx.add(global_idx)
+                    if allowed_form_hints is not None and form_hint not in allowed_form_hints:
+                        continue
+                    result.append(
+                        {
+                            "index": global_idx,
+                            "text": (button.inner_text() or "").strip().lower(),
+                            "form_hint": form_hint,
+                            "css": button_selector,
+                            "css_nth": idx,
+                        }
+                    )
+                    print(f"  [COLLECT] MTS online #{len(result)} ({form_hint})")
+                except Exception:
+                    pass
 
     # По ключевым словам (connection и др.)
     if include_generic_buttons:
@@ -2524,6 +2566,8 @@ def collect_popup_buttons(
             btn = all_btns.nth(i)
             try:
                 if not btn.is_visible() or not btn.is_enabled():
+                    continue
+                if i in seen_idx:
                     continue
                 text = (btn.inner_text() or "").strip().lower()
                 if not any(kw in text for kw in POPUP_OPEN_KEYWORDS):
@@ -3447,6 +3491,7 @@ def process_checkaddress_form(
                     candidate.is_visible()
                     and candidate.locator(cfg["phone"]).count() > 0
                     and candidate.locator(cfg["street"]).count() > 0
+                    and candidate.locator(cfg["submit"]).count() > 0
                 ):
                     container = candidate
                     break
@@ -3466,7 +3511,7 @@ def process_checkaddress_form(
         print("  [CHECKADDRESS] Инлайн-форма не найдена, пробуем открыть попап по кнопке")
         trigger_selector = POPUP_BUTTON_CLASSES["checkaddress"]
         if _use_mts_online_locators(page):
-            trigger_selector = f"{trigger_selector}, .tariffs__address"
+            trigger_selector = f"{trigger_selector}, {MTS_ONLINE_POPUP_BUTTON_SELECTOR}"
         triggers = page.locator(trigger_selector)
         detected_form = None
         popup_container = None
@@ -3833,6 +3878,22 @@ def _form_oriented_presence_error(form_type: str, reason: str) -> str:
 
 def _find_presence_trigger(page: Page, form_type: str):
     effective_form_type = "connection" if form_type == "connection_cards" else form_type
+    if _use_mts_online_locators(page) and effective_form_type in {
+        "checkaddress",
+        "connection",
+        "profit",
+        "express-connection",
+        "undecided",
+    }:
+        buttons = page.locator(MTS_ONLINE_POPUP_BUTTON_SELECTOR)
+        for index in range(buttons.count()):
+            button = buttons.nth(index)
+            try:
+                if button.is_visible() and button.is_enabled():
+                    return button
+            except Exception:
+                pass
+
     selector = POPUP_BUTTON_CLASSES.get(effective_form_type)
     if not selector:
         return None
