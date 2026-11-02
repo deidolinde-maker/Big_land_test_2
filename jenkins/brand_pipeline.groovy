@@ -95,6 +95,36 @@ PY
                 echo 'Allure publish skipped.'
               }
               archiveArtifacts artifacts: 'allure-results/**, artifacts/videos/**, telegram_message.txt, telegram_should_send.txt, telegram_alert_message.txt, telegram_alert_should_send.txt', allowEmptyArchive: true
+              sh '''
+                set +e
+                purge_every=4
+                if ! [ "${BUILD_NUMBER}" -ge 1 ] 2>/dev/null; then
+                  echo "[PURGE] BUILD_NUMBER is not numeric, skip."
+                  exit 0
+                fi
+                if [ $(( BUILD_NUMBER % purge_every )) -ne 0 ]; then
+                  echo "[PURGE] Skip: build #${BUILD_NUMBER}; cleanup runs every ${purge_every}-th build."
+                  exit 0
+                fi
+                if [ -z "${JENKINS_HOME}" ] || [ -z "${JOB_NAME}" ]; then
+                  echo "[PURGE] JENKINS_HOME or JOB_NAME is empty, skip."
+                  exit 0
+                fi
+
+                job_path="$(printf '%s' "${JOB_NAME}" | sed 's#/#/jobs/#g')"
+                builds_dir="${JENKINS_HOME}/jobs/${job_path}/builds"
+                if [ ! -d "${builds_dir}" ]; then
+                  echo "[PURGE] Builds dir not found: ${builds_dir}"
+                  exit 0
+                fi
+
+                echo "[PURGE] Removing archived artifacts and Allure reports from previous builds."
+                find "${builds_dir}" -mindepth 2 -maxdepth 2 -type d \\
+                  \( -name archive -o -name allure-report \) \\
+                  ! -path "${builds_dir}/${BUILD_NUMBER}/*" \\
+                  -print -exec rm -rf {} +
+                echo "[PURGE] Done for ${JOB_NAME}, build #${BUILD_NUMBER}."
+              '''
             }
           }
         }

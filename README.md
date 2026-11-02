@@ -244,8 +244,9 @@ CLI-параметры определены в `conftest.py`:
 
 Периодическая чистка архивов Jenkins:
 
-- если `ENABLE_PERIODIC_ARTIFACT_PURGE=true`,
-- каждый `PERIODIC_PURGE_EVERY`-й билд удаляет архивы и `allure-report` у прошлых билдов текущей job.
+- общий `brand_pipeline.groovy` запускает очистку автоматически на каждом 4-м билде;
+- удаляются `archive` и `allure-report` у прошлых билдов текущей job;
+- артефакты текущего билда сохраняются.
 
 ## Jenkins: как настроить авто-цепочку
 
