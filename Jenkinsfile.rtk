@@ -1,5 +1,6 @@
 def pipeline
 node {
+  properties([pipelineTriggers([cron('TZ=Europe/Moscow\n35 1,6,12,15,18,21,23 * * *')])])
   checkout scm
   pipeline = load 'jenkins/brand_pipeline.groovy'
   pipeline.runBrand('rtk')
