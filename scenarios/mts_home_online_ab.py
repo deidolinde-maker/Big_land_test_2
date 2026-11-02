@@ -709,6 +709,10 @@ SUGGESTION_SELECTORS = [
     ".autocomplete__item", ".autocomplete-item", ".ui-menu-item",
     "[class*='suggest'] li", "[class*='autocomplete'] li",
     "[class*='dropdown'] li",
+    "[data-street-results] .address-item[data-index]",
+    "[data-house-results] .address-item[data-index]",
+    ".address-results.street-results .address-item",
+    ".address-results.house-results .address-item",
     "#street-list div", "#street-list li", "#street-list [data-value]",
     "#house-list div", "#house-list li", "#house-list [data-value]",
 ]
