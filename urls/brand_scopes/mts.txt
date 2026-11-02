@@ -3,4 +3,4 @@ https://moskva.mts-home.online/
 https://sankt-peterburg.mts-home.online/
 https://barnaul.mts-home.online/
 https://internet-mts-home.online/
-https://mts-internet.online/
+# https://mts-internet.online/ — временно исключён из прогона

@@ -109,6 +109,48 @@ def _normalize_runtime_url(url: str) -> str:
     return f"{scheme}://{host}{path}"
 
 
+def _is_mts_home_gpon_url(url: str) -> bool:
+    host = (urlsplit(url or "").hostname or "").lower().rstrip(".")
+    return host == MTS_HOME_GPON_HOST
+
+
+def _use_mts_next_locators(page: Page | None) -> bool:
+    return bool(page is not None and getattr(page, "_use_mts_next_locators", False))
+
+
+def form_config_for_page(page: Page | None, form_type: str) -> dict:
+    if (
+        _use_mts_next_locators(page)
+        and form_type in MTS_NEXT_ADDRESS_FORM_TYPES
+    ):
+        return dict(MTS_NEXT_CHECKADDRESS_CONFIG)
+    return dict(FORM_CONFIGS[form_type])
+
+
+def refresh_mts_home_gpon_version(page: Page, url: str) -> None:
+    """Refresh AB locator mode from the landing's localStorage marker."""
+    if not _is_mts_home_gpon_url(url):
+        return
+    try:
+        marker_present = bool(page.evaluate(
+            "key => window.localStorage.getItem(key) !== null",
+            MTS_YANDEX_EVENTS_STORAGE_KEY,
+        ))
+        page._use_mts_next_locators = marker_present
+        mode = "new data-testid" if marker_present else "legacy CSS"
+        print(f"  [VERSION] MTS GPON: {mode} ({MTS_YANDEX_EVENTS_STORAGE_KEY})")
+    except Exception as exc:
+        page._use_mts_next_locators = False
+        print(f"  [VERSION] ⚠️ Не удалось прочитать MTS GPON version marker: {exc}")
+
+
+def effective_mts_gpon_expected_forms(page: Page, forms: set[str]) -> set[str]:
+    """Profit exists only in the legacy AB version of MTS GPON."""
+    if _use_mts_next_locators(page):
+        return set(forms) - {"profit"}
+    return set(forms)
+
+
 def _is_beeline_runtime_url(url: str) -> bool:
     host = (urlsplit(_normalize_runtime_url(url)).netloc or "").lower()
     if not host:
@@ -530,6 +572,27 @@ POPUP_BUTTON_CLASSES = {
     "moving":             ".moving_address_button",
     "profit":             ".button-lead-catcher.profit_address_button, button.profit_address_button, a.profit_address_button, .profit_address_button",
     "express-connection": ".express-connection_address_button",
+}
+
+MTS_HOME_GPON_HOST = "mts-home-gpon.ru"
+MTS_YANDEX_EVENTS_STORAGE_KEY = "landing-yandex-events:v1"
+MTS_NEXT_CHECKADDRESS_CONFIG = {
+    "street": "[data-testid='mts-address-street-input']",
+    "house": "[data-testid='mts-address-house-input']",
+    "phone": "[data-testid='mts-address-phone-input']",
+    "submit": "[data-testid='mts-address-submit']",
+    "no_house": False,
+    "no_suggest": False,
+}
+MTS_NEXT_ADDRESS_FORM_TYPES = {
+    "checkaddress",
+    "connection",
+    "profit",
+    "express-connection",
+}
+MTS_NEXT_POPUP_BUTTONS = {
+    "checkaddress": "[data-testid='mts-footer-address-check'], [data-testid='mts-promo-cta'][data-cta-kind='button']",
+    "connection": "[data-testid='mts-tariffs-address-button'], [data-testid='mts-floating-quick-connect'], [data-testid='mts-tariff-card-connect']",
 }
 
 # Конфиги сайтов подаются через provider-loader (config/providers + config/loader.py).
@@ -1095,6 +1158,7 @@ def safe_goto(
         try:
             response = page.goto(url, wait_until="domcontentloaded", timeout=goto_timeout_ms)
             page.wait_for_timeout(500)
+            refresh_mts_home_gpon_version(page, url)
 
             status = None
             try:
@@ -1738,7 +1802,7 @@ def _stabilize_form_before_retry(page: Page, container, form_type: str) -> str:
     except Exception:
         pass
 
-    cfg = FORM_CONFIGS.get(form_type, {})
+    cfg = form_config_for_page(page, form_type)
     phone_sel = cfg.get("phone")
     if phone_sel:
         phone = container.locator(phone_sel).first
@@ -1784,7 +1848,7 @@ def _stabilize_form_before_retry(page: Page, container, form_type: str) -> str:
 def fill_form(page: Page, container, form_type: str,
               has_name_field: bool = False,
               service_place_value: str | None = None) -> bool:
-    cfg        = FORM_CONFIGS[form_type]
+    cfg        = form_config_for_page(page, form_type)
     no_house   = cfg.get("no_house", False)
     no_suggest = cfg.get("no_suggest", False)
     street_local = container.locator(cfg["street"]).first
@@ -2108,8 +2172,8 @@ def fill_form(page: Page, container, form_type: str,
     return True
 
 
-def find_submit(container, form_type: str):
-    cfg    = FORM_CONFIGS[form_type]
+def find_submit(container, form_type: str, page: Page | None = None):
+    cfg    = form_config_for_page(page, form_type)
     submit_selectors = [cfg["submit"]]
 
     for submit_selector in submit_selectors:
@@ -2136,7 +2200,7 @@ def submit_with_confirmation(
     Пытается отправить форму и дождаться подтверждения.
     Делает повторную попытку submit при редких флаках no_confirmation.
     """
-    last_submit = find_submit(container, form_type)
+    last_submit = find_submit(container, form_type, page)
     if last_submit is None:
         return False
 
@@ -2168,7 +2232,7 @@ def submit_with_confirmation(
                 last_submit.click(force=True)
             except Exception:
                 # Форма могла перерендериться — пробуем найти submit снова
-                last_submit = find_submit(container, form_type)
+                last_submit = find_submit(container, form_type, page)
                 if last_submit is None:
                     return False
                 last_submit.scroll_into_view_if_needed()
@@ -2238,11 +2302,22 @@ def submit_with_confirmation(
 
 def wait_for_popup_with_fields(page: Page, timeout_ms: int = 10_000,
                                 form_hint=None):
-    form_types_to_check = (
-        [(form_hint, FORM_CONFIGS[form_hint])]
-        if form_hint and form_hint in FORM_CONFIGS
-        else list(FORM_CONFIGS.items())
-    )
+    if _use_mts_next_locators(page):
+        if form_hint == "profit":
+            return None, None
+        if form_hint in MTS_NEXT_ADDRESS_FORM_TYPES:
+            form_types_to_check = [(form_hint, dict(MTS_NEXT_CHECKADDRESS_CONFIG))]
+        else:
+            form_types_to_check = [
+                (form_type, dict(MTS_NEXT_CHECKADDRESS_CONFIG))
+                for form_type in ("checkaddress", "connection", "undecided")
+            ]
+    else:
+        form_types_to_check = (
+            [(form_hint, FORM_CONFIGS[form_hint])]
+            if form_hint and form_hint in FORM_CONFIGS
+            else list(FORM_CONFIGS.items())
+        )
     poll_ms = 300
     elapsed = 0
 
@@ -2326,7 +2401,7 @@ def resolve_checkaddress_container_after_click(page: Page, timeout_ms: int = 12_
     if detected_form == "checkaddress" and popup_container is not None:
         return detected_form, popup_container
 
-    cfg = FORM_CONFIGS["checkaddress"]
+    cfg = form_config_for_page(page, "checkaddress")
     poll_ms = 250
     elapsed = 0
     while elapsed < 3_500:
@@ -2358,6 +2433,31 @@ def collect_popup_buttons(
     text_counters = {}
 
     print(f"\n[COLLECT] Кнопок на странице: {total}")
+
+    if _use_mts_next_locators(page):
+        for form_hint, selector in MTS_NEXT_POPUP_BUTTONS.items():
+            if allowed_form_hints is not None and form_hint not in allowed_form_hints:
+                continue
+            buttons = page.locator(selector)
+            for index in range(buttons.count()):
+                button = buttons.nth(index)
+                try:
+                    if not button.is_visible() or not button.is_enabled():
+                        continue
+                    result.append(
+                        {
+                            "index": button.evaluate(
+                                "el => Array.from(document.querySelectorAll('button')).indexOf(el)"
+                            ),
+                            "text": (button.inner_text() or "").strip().lower(),
+                            "form_hint": form_hint,
+                            "css": selector,
+                            "trigger_kind": form_hint,
+                        }
+                    )
+                    print(f"  [COLLECT] MTS new #{len(result)} ({form_hint})")
+                except Exception:
+                    pass
 
     # По ключевым словам (connection и др.)
     if include_generic_buttons:
@@ -2534,7 +2634,7 @@ def process_auto_profit_popup(
         log_error("form_not_filled", page, site_label, extra="auto profit popup")
         return 0, 1, "AUTO-PROFIT code=form_not_filled"[:220], True
 
-    submit = find_submit(container, form_type)
+    submit = find_submit(container, form_type, page)
     if submit is None:
         log_error("submit_not_found", page, site_label, extra="auto profit popup")
         return 0, 1, "AUTO-PROFIT code=submit_not_found"[:220], True
@@ -2916,7 +3016,7 @@ def _run_popup_cycle(page: Page, buttons: list, base_url: str,
                     register_failure("form_not_filled", f"service={service_label}")
                     continue
 
-            submit = find_submit(container, form_type)
+            submit = find_submit(container, form_type, page)
             if submit is None:
                 recover_status = recover_from_unexpected_profit(
                     f"поиск submit в целевой форме ({service_label})"
@@ -2927,7 +3027,7 @@ def _run_popup_cycle(page: Page, buttons: list, base_url: str,
                         log_error("popup_not_found", page, site_label, extra="after auto-profit recovery")
                         register_failure("popup_not_found", f"after auto-profit recovery | service={service_label}")
                         continue
-                    submit = find_submit(container, form_type)
+                    submit = find_submit(container, form_type, page)
                     if submit is None:
                         log_error("submit_not_found", page, site_label, extra=f"service={service_label}")
                         register_failure("submit_not_found", f"service={service_label}")
@@ -3011,7 +3111,10 @@ def process_all_popups(page: Page, base_url: str,
         target_text = ", ".join(sorted(expected_form_types or set()))
         print(f"[POPUP] Target form mode: {target_text}")
 
-    should_check_auto_profit = expected_form_types is None or "profit" in expected_form_types
+    should_check_auto_profit = (
+        not _use_mts_next_locators(page)
+        and (expected_form_types is None or "profit" in expected_form_types)
+    )
     if should_check_auto_profit:
         auto_success, auto_failed, auto_first_fail, _auto_tested = process_auto_profit_popup(
             page,
@@ -3022,7 +3125,7 @@ def process_all_popups(page: Page, base_url: str,
         )
     else:
         auto_success, auto_failed, auto_first_fail, _auto_tested = 0, 0, None, False
-        print("[AUTO-PROFIT] Пропуск: profit не входит в expected_form_types")
+        print("[AUTO-PROFIT] Пропуск: profit отсутствует в текущей AB-версии")
 
     pretested_form_types: set[str] = set()
     pretested_trigger_kinds: set[str] = set()
@@ -3138,7 +3241,7 @@ def process_inline_connection_form(
     (без popup-триггера), например rtk-home.ru/.../podklyuchenie-interneta.
     """
     print("\n[INLINE-CONNECTION] Проверка inline-формы connection")
-    cfg = FORM_CONFIGS["connection"]
+    cfg = form_config_for_page(page, "connection")
     container = page.locator("section, form, div").filter(
         has=page.locator(cfg["phone"])
     ).first
@@ -3157,7 +3260,7 @@ def process_inline_connection_form(
         print(f"  [INLINE-CONNECTION] ❌ {reason}")
         return 0, 1, reason, {"connection"}
 
-    submit = find_submit(container, "connection")
+    submit = find_submit(container, "connection", page)
     if not submit:
         reason = "кнопка отправки inline connection не найдена"
         print(f"  [INLINE-CONNECTION] ❌ {reason}")
@@ -3207,7 +3310,7 @@ def process_inline_undecided_form(
     (без popup-триггера).
     """
     print("\n[INLINE-UNDECIDED] Проверка inline-формы undecided")
-    cfg = FORM_CONFIGS["undecided"]
+    cfg = form_config_for_page(page, "undecided")
     container = page.locator("section, form, div").filter(
         has=page.locator(cfg["phone"])
     ).first
@@ -3226,7 +3329,7 @@ def process_inline_undecided_form(
         print(f"  [INLINE-UNDECIDED] ❌ {reason}")
         return 0, 1, reason, {"undecided"}
 
-    submit = find_submit(container, "undecided")
+    submit = find_submit(container, "undecided", page)
     if not submit:
         reason = "кнопка отправки inline undecided не найдена"
         print(f"  [INLINE-UNDECIDED] ❌ {reason}")
@@ -3275,7 +3378,7 @@ def process_checkaddress_form(
     1) инлайн-форма на странице
     2) попап по кнопке .checkaddress_address_button
     """
-    cfg = FORM_CONFIGS["checkaddress"]
+    cfg = form_config_for_page(page, "checkaddress")
     container = page.locator("section, form, div").filter(
         has=page.locator(cfg["phone"])
     ).first
@@ -3287,7 +3390,12 @@ def process_checkaddress_form(
 
     if not has_inline:
         print("  [CHECKADDRESS] Инлайн-форма не найдена, пробуем открыть попап по кнопке")
-        triggers = page.locator(POPUP_BUTTON_CLASSES["checkaddress"])
+        trigger_selector = POPUP_BUTTON_CLASSES["checkaddress"]
+        if _use_mts_next_locators(page):
+            trigger_selector = (
+                f"{trigger_selector}, {MTS_NEXT_POPUP_BUTTONS['checkaddress']}"
+            )
+        triggers = page.locator(trigger_selector)
         detected_form = None
         popup_container = None
         last_click_error: Exception | None = None
@@ -3349,7 +3457,7 @@ def process_checkaddress_form(
     if not filled:
         return 0, 1, "форма checkaddress не заполнена"
 
-    submit = find_submit(container, "checkaddress")
+    submit = find_submit(container, "checkaddress", page)
     if not submit:
         return 0, 1, "кнопка отправки checkaddress не найдена"
 
@@ -3654,6 +3762,8 @@ def _form_oriented_presence_error(form_type: str, reason: str) -> str:
 def _find_presence_trigger(page: Page, form_type: str):
     effective_form_type = "connection" if form_type == "connection_cards" else form_type
     selector = POPUP_BUTTON_CLASSES.get(effective_form_type)
+    if _use_mts_next_locators(page):
+        selector = MTS_NEXT_POPUP_BUTTONS.get(effective_form_type, selector)
     if not selector:
         return None
     buttons = page.locator(selector)
@@ -3669,7 +3779,7 @@ def _find_presence_trigger(page: Page, form_type: str):
 
 def _presence_container_has_required_fields(container, form_type: str) -> bool:
     effective_form_type = "connection" if form_type == "connection_cards" else form_type
-    cfg = FORM_CONFIGS.get(effective_form_type)
+    cfg = form_config_for_page(page, effective_form_type) if effective_form_type in FORM_CONFIGS else None
     if not cfg:
         return False
     try:
@@ -3698,7 +3808,7 @@ def _presence_check_one_form(page: Page, base_url: str, form_type: str) -> tuple
     effective_form_type = "connection" if form_type == "connection_cards" else form_type
     if effective_form_type in {"connection", "undecided"}:
         inline_container = find_visible_form_container_by_phone(
-            page, FORM_CONFIGS[effective_form_type]
+            page, form_config_for_page(page, effective_form_type)
         )
         if inline_container is not None and _presence_container_has_required_fields(
             inline_container, effective_form_type
@@ -3979,6 +4089,11 @@ def run_site_scenario(page: Page, cfg: dict):
             )
             mark_step_not_applicable(site_label, "1", "форма checkaddress", reason)
 
+    # AB-версия определяется после навигации: profit есть только в legacy.
+    expected_forms = effective_mts_gpon_expected_forms(page, expected_forms)
+    expected_popup_forms = expected_forms - {"checkaddress", "business"}
+    optional_popup_forms = optional_expected_forms - {"checkaddress", "business"}
+
     # ── 2. Попапы главной ─────────────────────────────────────────────────
     with allure.step("Шаг 2: попапы главной"):
         if is_url_mode and not expected_popup_forms and not expect_connection_cards:
@@ -3991,6 +4106,8 @@ def run_site_scenario(page: Page, cfg: dict):
         else:
             print(f"\n{sep}\n[{site_label}] Шаг 2: попапы главной\n{sep}")
             goto_or_handle_step(page, base_url, site_label, "2", "попапы главной")
+            expected_forms = effective_mts_gpon_expected_forms(page, expected_forms)
+            expected_popup_forms = expected_forms - {"checkaddress", "business"}
             close_overlays(page)
             try:
                 s, f, first_fail, tested_popup_forms, tested_trigger_kinds = process_all_popups(

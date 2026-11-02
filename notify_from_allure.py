@@ -9,7 +9,7 @@ import os
 import re
 import sys
 
-from alert_events import event_file
+from alert_events import event_file, root_domain
 
 
 RESULTS_DIR = Path(os.getenv("ALLURE_RESULTS_DIR", "allure-results"))
@@ -175,8 +175,16 @@ def build_runtime_alert(events: list[dict]) -> tuple[str, bool, str]:
             "last_seen_utc": datetime.now(timezone.utc).isoformat(),
         }
 
+    resolved_groups: set[tuple[str, str]] = set()
     for group_key in sorted(set(previous) - set(current)):
         item = previous[group_key]
+        resolved_key = (
+            str(item.get("domain") or "unknown-site"),
+            str(item.get("step") or "не указан"),
+        )
+        if resolved_key in resolved_groups:
+            continue
+        resolved_groups.add(resolved_key)
         blocks.append(
             "\n".join(
                 [
@@ -288,6 +296,16 @@ def extract_browser_name(data: dict) -> str:
     return ""
 
 
+def extract_page_url(data: dict) -> str:
+    for param in data.get("parameters") or []:
+        if (param.get("name") or "").strip() == "url":
+            value = str(param.get("value") or "").strip().strip("'\"")
+            if value.startswith(("http://", "https://")):
+                return value
+    match = re.search(r"https?://[^\s\]]+", str(data.get("name") or ""))
+    return match.group(0).rstrip(".,") if match else ""
+
+
 def collect_results(results_dir: Path) -> tuple[int, list[dict]]:
     passed = 0
     failed_records: list[dict] = []
@@ -312,6 +330,7 @@ def collect_results(results_dir: Path) -> tuple[int, list[dict]]:
         failed_records.append(
             {
                 "site": extract_site_label(data),
+                "url": extract_page_url(data),
                 "name": normalize_text(data.get("name") or path.name, max_len=180),
                 "message": normalize_text(details.get("message") or "без текста ошибки", max_len=240),
                 "browser": extract_browser_name(data),
@@ -433,9 +452,12 @@ def current_summary_slot(now: datetime | None = None) -> tuple[str, datetime]:
 def build_period_summary(runs: list[dict], slot: str) -> str:
     total_passed = sum(int(run.get("passed") or 0) for run in runs)
     all_failures = [item for run in runs for item in (run.get("failed_records") or [])]
-    grouped: dict[tuple[str, str], list[dict]] = {}
+    grouped: dict[tuple[str, str, str], list[dict]] = {}
     for item in all_failures:
-        key = (item.get("site") or "unknown-site", item.get("step") or "Не выполнен шаг тест-кейса")
+        site = root_domain(item.get("site") or "unknown-site")
+        step = item.get("step") or "Не выполнен шаг тест-кейса"
+        message = normalize_text(item.get("message") or "без деталей", max_len=180)
+        key = (site, step, message)
         grouped.setdefault(key, []).append(item)
 
     first_time = runs[0].get("timestamp") if runs else ""
@@ -448,24 +470,30 @@ def build_period_summary(runs: list[dict], slot: str) -> str:
         "📊 Результат",
         f"• Прогонов: {len(runs)}",
         f"• Успешных проверок: {total_passed}",
-        f"• Ошибок: {len(all_failures)}",
+        f"• Групп ошибок: {len(grouped)}",
+        f"• Событий ошибок: {len(all_failures)}",
     ]
     if all_failures:
-        lines.extend(["", f"❌ Ошибки по сайтам ({len(grouped)}):"])
-        for index, ((site, step), items) in enumerate(
+        lines.extend(["", f"❌ Группы ошибок ({len(grouped)}):"])
+        for index, ((site, step, sample), items) in enumerate(
             sorted(grouped.items(), key=lambda pair: len(pair[1]), reverse=True),
             1,
         ):
-            sample = normalize_text(items[0].get("message") or "без деталей", max_len=180)
+            pages = sorted({item.get("url") for item in items if item.get("url")})
             lines.extend(
                 [
                     "",
                     f"{index}) 🌐 {site}",
                     f"   🧩 Шаг: {step}",
-                    f"   📌 Количество: {len(items)}",
+                    f"   📌 Событий: {len(items)} | Страниц: {len(pages)}",
                     f"   💬 Пример: {sample}",
                 ]
             )
+            if pages:
+                lines.append("   📄 Страницы:")
+                lines.extend(f"   • {page}" for page in pages[:8])
+                if len(pages) > 8:
+                    lines.append(f"   • ... и ещё {len(pages) - 8}")
     else:
         lines.extend(["", "✅ Ошибок за период не зафиксировано."])
 
