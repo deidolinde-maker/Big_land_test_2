@@ -119,8 +119,10 @@ PY
                 fi
 
                 echo "[PURGE] Removing archived artifacts and Allure reports from previous builds."
-                find "${builds_dir}" -mindepth 2 -maxdepth 2 -type d \\
-                  \( -name archive -o -name allure-report \) \\
+                find "${builds_dir}" -mindepth 2 -maxdepth 2 -type d -name archive \\
+                  ! -path "${builds_dir}/${BUILD_NUMBER}/*" \\
+                  -print -exec rm -rf {} +
+                find "${builds_dir}" -mindepth 2 -maxdepth 2 -type d -name allure-report \\
                   ! -path "${builds_dir}/${BUILD_NUMBER}/*" \\
                   -print -exec rm -rf {} +
                 echo "[PURGE] Done for ${JOB_NAME}, build #${BUILD_NUMBER}."
