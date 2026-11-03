@@ -713,7 +713,7 @@ SUGGESTION_SELECTORS = [
     "[data-house-results] .address-item[data-index]",
     ".address-results.street-results .address-item",
     ".address-results.house-results .address-item",
-    "#street-list div", "#street-list li", "#street-list [data-value]",
+    "#street-list li", "#street-list [data-value]",
     "#house-list div", "#house-list li", "#house-list [data-value]",
 ]
 
@@ -1858,6 +1858,47 @@ def _collect_invalid_controls(container, limit: int = 5) -> list[str]:
     return details
 
 
+def _collect_form_validation_errors(container, limit: int = 5) -> list[str]:
+    """Returns visible validation errors before waiting for submit confirmation."""
+    details: list[str] = []
+    try:
+        invalid = container.locator(
+            "input:invalid:visible, textarea:invalid:visible, select:invalid:visible"
+        )
+        for index in range(min(invalid.count(), limit)):
+            control = invalid.nth(index)
+            label = (
+                control.get_attribute("name")
+                or control.get_attribute("placeholder")
+                or control.get_attribute("id")
+                or "field"
+            )
+            message = control.evaluate("el => el.validationMessage || ''") or ""
+            details.append(f"{label}: {message}".strip(": "))
+    except Exception:
+        pass
+
+    try:
+        messages = container.locator(
+            "[role='alert']:visible, [aria-live='assertive']:visible, "
+            "[data-field-error]:visible, [class*='error']:visible, [class*='Error']:visible"
+        )
+        markers = ("неверн", "ошиб", "обязатель", "заполн", "выбер", "некоррект")
+        for index in range(min(messages.count(), limit)):
+            text = " ".join((messages.nth(index).inner_text() or "").split()).strip()
+            if text and any(marker in text.lower() for marker in markers):
+                details.append(text[:220])
+    except Exception:
+        pass
+
+    unique: list[str] = []
+    for item in details:
+        if item and item not in unique:
+            unique.append(item)
+    return unique[:limit]
+
+
+
 def _stabilize_form_before_retry(page: Page, container, form_type: str) -> str:
     """
     Перед повторным submit усиливаем подготовку формы:
@@ -2271,6 +2312,11 @@ def submit_with_confirmation(
     if last_submit is None:
         return False
 
+    validation_errors = _collect_form_validation_errors(container)
+    if validation_errors:
+        print("  [SUBMIT] ❌ Validation error before submit: " + " | ".join(validation_errors))
+        return False
+
     cf7_seen_statuses: list[str] = []
 
     def _cf7_response_listener(response):
@@ -2304,6 +2350,13 @@ def submit_with_confirmation(
                     return False
                 last_submit.scroll_into_view_if_needed()
                 last_submit.click(force=True)
+
+            # Validation messages appear immediately after the click on some forms.
+            page.wait_for_timeout(250)
+            validation_errors = _collect_form_validation_errors(container)
+            if validation_errors:
+                print("  [SUBMIT] ❌ Validation error after submit: " + " | ".join(validation_errors))
+                return False
 
             cf7_timeout = browser_timeout(page, 1_200, 2_500)
             cf7_status = wait_for_cf7_feedback_status(page, timeout_ms=cf7_timeout)
