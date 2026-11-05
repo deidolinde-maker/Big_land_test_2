@@ -1,4 +1,16 @@
 def runBrand(String fixedScope) {
+  def productionTelegramScopes = [
+    'beeline',
+    'mega',
+    'mts',
+    'providerdom',
+    'rtk',
+    't2',
+  ] as Set
+  def telegramCredId = productionTelegramScopes.contains(fixedScope)
+    ? 'telegram_proxy_global_test'
+    : 'tg_proxy_creds_survarius'
+
   timestamps {
       def testFailure = null
       def testFile = "scenarios/${fixedScope}.py"
@@ -7,7 +19,7 @@ def runBrand(String fixedScope) {
         string(credentialsId: 'browser_proxy_creds', variable: 'BROWSER_PROXY'),
         string(credentialsId: 'telegram_proxy_url', variable: 'TELEGRAM_PROXY_URL'),
         string(credentialsId: 'telegram_proxy_auth_secret', variable: 'TELEGRAM_PROXY_AUTH_SECRET'),
-        string(credentialsId: 'tg_proxy_creds_survarius', variable: 'TELEGRAM_PROXY_CREDS'),
+        string(credentialsId: telegramCredId, variable: 'TELEGRAM_PROXY_CREDS'),
       ]) {
         withEnv([
           "RUN_MODE=brand-oriented",
