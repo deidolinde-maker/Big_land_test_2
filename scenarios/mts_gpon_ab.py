@@ -128,19 +128,45 @@ def form_config_for_page(page: Page | None, form_type: str) -> dict:
 
 
 def refresh_mts_home_gpon_version(page: Page, url: str) -> None:
-    """Refresh AB locator mode from the landing's localStorage marker."""
+    """Determine and lock the AB locator mode for the current browser session.
+
+    The MTS AB assignment is session-scoped.  Re-reading the marker after
+    every navigation could switch the test from legacy CSS selectors to the
+    new ``data-testid`` selectors in the middle of one URL scenario.  Keep the
+    cookies/localStorage intact and make the first successful determination
+    authoritative for all subsequent forms and popup navigations.
+    """
     if not _is_mts_home_gpon_url(url):
+        return
+    if getattr(page, "_mts_gpon_version_locked", False):
+        mode = "new data-testid" if _use_mts_next_locators(page) else "legacy CSS"
+        print(f"  [VERSION] MTS GPON: {mode} (locked for session)")
         return
     try:
         marker_present = bool(page.evaluate(
             "key => window.localStorage.getItem(key) !== null",
             MTS_YANDEX_EVENTS_STORAGE_KEY,
         ))
-        page._use_mts_next_locators = marker_present
-        mode = "new data-testid" if marker_present else "legacy CSS"
-        print(f"  [VERSION] MTS GPON: {mode} ({MTS_YANDEX_EVENTS_STORAGE_KEY})")
+
+        # On the first load the marker can be written slightly later than
+        # domcontentloaded.  Detect the new DOM without reloading the page;
+        # this preserves the same browser session and avoids AB re-assignment.
+        new_dom_present = False
+        if not marker_present:
+            new_dom_present = page.locator(
+                "[data-testid='mts-address-street-input'], "
+                "[data-testid='mts-tariffs-address-button'], "
+                "[data-testid='mts-tariff-card-connect']"
+            ).count() > 0
+
+        page._use_mts_next_locators = marker_present or new_dom_present
+        page._mts_gpon_version_locked = True
+        mode = "new data-testid" if page._use_mts_next_locators else "legacy CSS"
+        source = MTS_YANDEX_EVENTS_STORAGE_KEY if marker_present else "initial DOM"
+        print(f"  [VERSION] MTS GPON: {mode} ({source}; locked for session)")
     except Exception as exc:
         page._use_mts_next_locators = False
+        page._mts_gpon_version_locked = True
         print(f"  [VERSION] ⚠️ Не удалось прочитать MTS GPON version marker: {exc}")
 
 
