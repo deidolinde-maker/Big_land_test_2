@@ -13,10 +13,10 @@ def runBrand(String fixedScope) {
           "RUN_MODE=brand-oriented",
           "BRAND_SCOPE=${fixedScope}",
           "PROVIDER_SCOPE=${fixedScope}",
-          "NOTIFY_MODE=twice_daily",
+          // Summary is independent per build; do not accumulate results between runs.
+          "NOTIFY_MODE=run",
           "PYTHONUNBUFFERED=1",
           "PW_VIDEO_DIR=artifacts/videos",
-          "SUMMARY_STATE_FILE=/var/lib/jenkins/shared/big_land_test_2/summary_${fixedScope}.json",
           "ALERT_STATE_FILE=/var/lib/jenkins/shared/big_land_test_2/alert_${fixedScope}.json",
           "PLAYWRIGHT_BROWSERS_PATH=/var/lib/jenkins/cache/ms-playwright",
           "PIP_CACHE_DIR=/var/lib/jenkins/cache/pip",

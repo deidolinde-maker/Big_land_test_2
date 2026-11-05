@@ -421,7 +421,6 @@ RUN_MODE=brand-oriented
 BRAND_SCOPE=<fixed scope>
 PYTEST_FILE=scenarios/<scope>.py
 ALLURE_RESULTS_DIR=allure-results
-SUMMARY_STATE_FILE=/var/lib/jenkins/shared/big_land_test_2/summary_<scope>.json
 ALERT_STATE_FILE=/var/lib/jenkins/shared/big_land_test_2/alert_<scope>.json
 ```
 
