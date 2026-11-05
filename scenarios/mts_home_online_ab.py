@@ -540,19 +540,32 @@ MTS_ONLINE_FORM_TYPE = "mts_home_online_address"
 MTS_ONLINE_FORM_ROOT = (
     "form[data-address-form], "
     "form.AdressForm.lead-form, "
-    "form.AddressModalForm.lead-form"
+    "form.AddressModalForm.lead-form, "
+    "form.AdressCheckForm.lead-form"
 )
 MTS_ONLINE_POPUP_BUTTON_SELECTOR = (
     "button[data-modal-open='address'], "
     "[data-modal-open='address'][role='button'], "
     "button[data-modal-open='floating-lead'], "
     "[data-modal-open='floating-lead'][role='button'], "
+    ".FloatingMenu__bar button.FloatingMenu__cta, "
+    ".TariffCard button.Button.Button--action.Button--big.Button--fullWidth, "
     ".tariffs__address"
 )
 MTS_ONLINE_POPUP_BUTTON_GROUPS = (
-    ("button[data-modal-open='address'], [data-modal-open='address'][role='button']", "connection"),
-    ("button[data-modal-open='floating-lead'], [data-modal-open='floating-lead'][role='button']", "express-connection"),
-    (".tariffs__address", "connection"),
+    (
+        "button[data-modal-open='address'], "
+        "[data-modal-open='address'][role='button'], "
+        ".TariffCard button.Button.Button--action.Button--big.Button--fullWidth, "
+        ".tariffs__address",
+        "connection",
+    ),
+    (
+        "button[data-modal-open='floating-lead'], "
+        "[data-modal-open='floating-lead'][role='button'], "
+        ".FloatingMenu__bar button.FloatingMenu__cta",
+        "connection",
+    ),
 )
 MTS_ONLINE_CHECKADDRESS_CONFIG = {
     # В новых шаблонах встречаются оба класса формы: исторический AdressForm
@@ -3271,7 +3284,10 @@ def process_all_popups(page: Page, base_url: str,
         target_text = ", ".join(sorted(expected_form_types or set()))
         print(f"[POPUP] Target form mode: {target_text}")
 
-    should_check_auto_profit = expected_form_types is None or "profit" in expected_form_types
+    should_check_auto_profit = (
+        not _is_mts_home_online_url(base_url)
+        and (expected_form_types is None or "profit" in expected_form_types)
+    )
     if should_check_auto_profit:
         auto_success, auto_failed, auto_first_fail, _auto_tested = process_auto_profit_popup(
             page,
